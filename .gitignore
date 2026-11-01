@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.log
+*.pdb
+GitManagerLibrary/
+config.json
+GitManager.exe
+GitManager.dll
+GitManager.deps.json
+GitManager.runtimeconfig.json
+GitManager_Portable_*.zip
