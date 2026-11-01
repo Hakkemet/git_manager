@@ -259,7 +259,8 @@ public class AppConfig
 {
     public string Language { get; set; } = "en_US";
     public string LibraryPath { get; set; } = string.Empty;
-    public int CheckIntervalMinutes { get; set; } = 30;
+    public int CheckIntervalMinutes { get; set; } = 1440;
+    public string LastDailySyncDate { get; set; } = string.Empty;
     public bool StartWithWindows { get; set; } = true;
     public bool MinimizeToTrayOnClose { get; set; } = true;
     public bool AutoUpdateApp { get; set; } = true;

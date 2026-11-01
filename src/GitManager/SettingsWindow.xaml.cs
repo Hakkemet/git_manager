@@ -21,7 +21,6 @@ public partial class SettingsWindow : Window
 
         var cfg = _configService.Config;
         LibraryPathBox.Text = cfg.LibraryPath;
-        IntervalBox.Text = cfg.CheckIntervalMinutes.ToString();
         StartWithWindowsCheck.IsChecked = cfg.StartWithWindows;
         MinimizeToTrayCheck.IsChecked = cfg.MinimizeToTrayOnClose;
         GitHubTokenBox.Text = cfg.GitHubToken;
@@ -91,10 +90,7 @@ public partial class SettingsWindow : Window
         if (!string.IsNullOrWhiteSpace(LibraryPathBox.Text))
             cfg.LibraryPath = LibraryPathBox.Text.Trim();
 
-        if (int.TryParse(IntervalBox.Text.Trim(), out int minutes) && minutes >= 1)
-            cfg.CheckIntervalMinutes = minutes;
-        else
-            cfg.CheckIntervalMinutes = 30;
+        cfg.CheckIntervalMinutes = 1440;
 
         if (LanguageComboBox.SelectedItem is ComboBoxItem { Tag: string selectedLang })
             cfg.Language = selectedLang;

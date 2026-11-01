@@ -53,12 +53,29 @@ public partial class MainWindow : Window
 
         Loaded += async (_, _) =>
         {
+            await RunDailyStartupSyncIfNeededAsync();
+        };
+    }
+
+    private async Task RunDailyStartupSyncIfNeededAsync()
+    {
+        var todayKey = DateTime.Now.ToString("yyyy-MM-dd");
+        bool alreadySyncedToday = string.Equals(_configService.Config.LastDailySyncDate, todayKey, StringComparison.OrdinalIgnoreCase);
+
+        // Sempre sincroniza na primeira abertura do dia (ou se houver algum repositório ainda sem .zip baixado)
+        bool hasPendingRepos = _configService.Config.Repositories.Any(r => r.Versions.Count == 0 || r.StatusMessage.Contains("403") || r.StatusMessage.Contains("Error"));
+
+        if (!alreadySyncedToday || hasPendingRepos)
+        {
+            _configService.Config.LastDailySyncDate = todayKey;
+            _configService.SaveConfig();
+
             await CheckSelfUpdateSilentAsync();
             if (_configService.Config.Repositories.Count > 0)
             {
                 await SyncAllRepositoriesAsync(forceNotification: false);
             }
-        };
+        }
     }
 
     private void OnLanguageChanged()
@@ -123,12 +140,8 @@ public partial class MainWindow : Window
 
     private void ConfigureBackgroundTimer()
     {
+        // A verificação automática ocorre apenas uma vez ao dia no primeiro momento em que o app é aberto.
         _backgroundTimer.Stop();
-        var minutes = Math.Max(1, _configService.Config.CheckIntervalMinutes);
-        _backgroundTimer.Interval = TimeSpan.FromMinutes(minutes);
-        _backgroundTimer.Tick -= BackgroundTimer_Tick;
-        _backgroundTimer.Tick += BackgroundTimer_Tick;
-        _backgroundTimer.Start();
     }
 
     private async void BackgroundTimer_Tick(object? sender, EventArgs e)
