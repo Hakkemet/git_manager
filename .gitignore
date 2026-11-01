@@ -12,3 +12,4 @@ GitManager.dll
 GitManager.deps.json
 GitManager.runtimeconfig.json
 GitManager_Portable_*.zip
+/Locales/

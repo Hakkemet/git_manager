@@ -145,29 +145,34 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private Forms.ToolStripMenuItem? _openItem;
+    private Forms.ToolStripMenuItem? _syncNowItem;
+    private Forms.ToolStripMenuItem? _openLibraryItem;
+    private Forms.ToolStripMenuItem? _exitItem;
+
     private void SetupTrayIcon()
     {
         _notifyIcon = new Forms.NotifyIcon
         {
-            Text = "GitManager - Biblioteca de Repositórios (.zip)",
+            Text = LocalizationService.Instance["TrayTooltip"],
             Icon = CreateTrayIcon(),
             Visible = true
         };
 
         var contextMenu = new Forms.ContextMenuStrip();
-        var openItem = new Forms.ToolStripMenuItem("Abrir GitManager");
-        openItem.Font = new Font(openItem.Font, System.Drawing.FontStyle.Bold);
-        openItem.Click += (_, _) => RestoreMainWindow();
+        _openItem = new Forms.ToolStripMenuItem(LocalizationService.Instance["TrayOpenApp"]);
+        _openItem.Font = new Font(_openItem.Font, System.Drawing.FontStyle.Bold);
+        _openItem.Click += (_, _) => RestoreMainWindow();
 
-        var syncNowItem = new Forms.ToolStripMenuItem("Sincronizar Todos os Repositórios Agora");
-        syncNowItem.Click += async (_, _) =>
+        _syncNowItem = new Forms.ToolStripMenuItem(LocalizationService.Instance["TraySyncNow"]);
+        _syncNowItem.Click += async (_, _) =>
         {
             if (_mainWindow != null)
                 await _mainWindow.SyncAllRepositoriesAsync(forceNotification: true);
         };
 
-        var openLibraryItem = new Forms.ToolStripMenuItem("Abrir Pasta GitManagerLibrary");
-        openLibraryItem.Click += (_, _) =>
+        _openLibraryItem = new Forms.ToolStripMenuItem(LocalizationService.Instance["TrayOpenLibrary"]);
+        _openLibraryItem.Click += (_, _) =>
         {
             if (Directory.Exists(ConfigService.Config.LibraryPath))
             {
@@ -175,14 +180,14 @@ public partial class App : System.Windows.Application
             }
         };
 
-        var exitItem = new Forms.ToolStripMenuItem("Sair Completamente");
-        exitItem.Click += (_, _) => ExitApplication();
+        _exitItem = new Forms.ToolStripMenuItem(LocalizationService.Instance["TrayExit"]);
+        _exitItem.Click += (_, _) => ExitApplication();
 
-        contextMenu.Items.Add(openItem);
-        contextMenu.Items.Add(syncNowItem);
-        contextMenu.Items.Add(openLibraryItem);
+        contextMenu.Items.Add(_openItem);
+        contextMenu.Items.Add(_syncNowItem);
+        contextMenu.Items.Add(_openLibraryItem);
         contextMenu.Items.Add(new Forms.ToolStripSeparator());
-        contextMenu.Items.Add(exitItem);
+        contextMenu.Items.Add(_exitItem);
 
         _notifyIcon.ContextMenuStrip = contextMenu;
         _notifyIcon.DoubleClick += (_, _) => RestoreMainWindow();
@@ -190,6 +195,15 @@ public partial class App : System.Windows.Application
         {
             if (args.Button == Forms.MouseButtons.Left)
                 RestoreMainWindow();
+        };
+
+        LocalizationService.Instance.LanguageChanged += () =>
+        {
+            if (_notifyIcon != null) _notifyIcon.Text = LocalizationService.Instance["TrayTooltip"];
+            if (_openItem != null) _openItem.Text = LocalizationService.Instance["TrayOpenApp"];
+            if (_syncNowItem != null) _syncNowItem.Text = LocalizationService.Instance["TraySyncNow"];
+            if (_openLibraryItem != null) _openLibraryItem.Text = LocalizationService.Instance["TrayOpenLibrary"];
+            if (_exitItem != null) _exitItem.Text = LocalizationService.Instance["TrayExit"];
         };
     }
 

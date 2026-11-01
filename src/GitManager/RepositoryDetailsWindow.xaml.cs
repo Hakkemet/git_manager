@@ -28,7 +28,7 @@ public partial class RepositoryDetailsWindow : Window
         _onCreateProjectRequested = onCreateProjectRequested;
 
         DataContext = _item;
-        Title = $"{_item.FullName} — Detalhes e Notas de Update";
+        Title = $"{_item.FullName} — {LocalizationService.Instance["DetailsWindowTitleSuffix"]}";
     }
 
     private async void SyncRepo_Click(object sender, RoutedEventArgs e)

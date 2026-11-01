@@ -1,7 +1,8 @@
 <Window x:Class="GitManager.RepositoryDetailsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Detalhes do Repositório — GitManager"
+        xmlns:svc="clr-namespace:GitManager.Services"
+        Title="GitManager"
         Width="780" Height="620"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterOwner"
@@ -16,7 +17,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Linha 0: Cabeçalho com Tag de Categoria, Nome e Ações Rápidas -->
+        <!-- Linha 0: Header -->
         <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -69,8 +70,10 @@
 
             <!-- Botões do Topo -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                <Button Content="📂 Pasta de .zips" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="OpenFolder_Click"/>
-                <Button Content="🌐 Abrir no GitHub" Style="{StaticResource SecondaryButton}" Click="OpenGitHub_Click"/>
+                <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsOpenZipsBtn]}"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="OpenFolder_Click"/>
+                <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsOpenGitHubBtn]}"
+                        Style="{StaticResource SecondaryButton}" Click="OpenGitHub_Click"/>
             </StackPanel>
         </Grid>
 
@@ -78,13 +81,13 @@
         <Border Grid.Row="1" Background="#111827" BorderBrush="#1E293B" BorderThickness="1"
                 CornerRadius="10" Padding="14,12" Margin="0,0,0,14">
             <StackPanel>
-                <TextBlock Text="📖 Descrição do Repositório Original:" FontSize="11.5" FontWeight="SemiBold"
-                           Foreground="#94A3B8" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsDescriptionHeader]}"
+                           FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" Margin="0,0,0,4"/>
                 <TextBlock Text="{Binding Description}" FontSize="13.5" Foreground="#E2E8F0" TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
 
-        <!-- Linha 2: Seletor de Versão (.zip) e Metadados da Versão -->
+        <!-- Linha 2: Seletor de Versão (.zip) -->
         <Border Grid.Row="2" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1"
                 CornerRadius="10" Padding="14,10" Margin="0,0,0,14">
             <Grid>
@@ -95,7 +98,8 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="📦 Versão (.zip) Selecionada:"
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsSelectedVersionLabel]}"
                            FontSize="12.5" FontWeight="SemiBold" Foreground="#CBD5E1"
                            VerticalAlignment="Center" Margin="0,0,10,0"/>
 
@@ -118,7 +122,7 @@
             </Grid>
         </Border>
 
-        <!-- Linha 3: Notas de Update, Releases e Últimos Commits -->
+        <!-- Linha 3: Notas de Update -->
         <Border Grid.Row="3" Background="#090D16" BorderBrush="#1E293B" BorderThickness="1"
                 CornerRadius="10" Padding="14">
             <Grid>
@@ -132,7 +136,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="📋 Notas de Update, Releases e Últimos Commits (Repositório Original):"
+                    <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsNotesHeader]}"
                                FontSize="12.5" FontWeight="SemiBold" Foreground="#94A3B8"/>
                     <TextBlock Grid.Column="1" Text="{Binding SelectedVersion.FileName, FallbackValue=''}"
                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
@@ -159,14 +163,15 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="0" x:Name="SyncModalBtn" Content="🔄 Verificar / Baixar Nova Versão .zip"
+            <Button Grid.Column="0" x:Name="SyncModalBtn"
+                    Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsSyncBtn]}"
                     Style="{StaticResource SecondaryButton}" Padding="14,9" Click="SyncRepo_Click"/>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <Button Content="🚀 Criar Projeto com esta Versão" Style="{StaticResource SuccessButton}"
-                        Padding="18,9" Margin="0,0,10,0" Click="CreateProject_Click"/>
-                <Button Content="Fechar" Style="{StaticResource SecondaryButton}"
-                        Width="100" Padding="12,9" Click="Close_Click"/>
+                <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsCreateProjectBtn]}"
+                        Style="{StaticResource SuccessButton}" Padding="18,9" Margin="0,0,10,0" Click="CreateProject_Click"/>
+                <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CloseBtn]}"
+                        Style="{StaticResource SecondaryButton}" Width="100" Padding="12,9" Click="Close_Click"/>
             </StackPanel>
         </Grid>
     </Grid>

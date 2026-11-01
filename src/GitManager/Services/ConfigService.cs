@@ -22,6 +22,7 @@ public class ConfigService
         BaseDirectory = ResolveBaseDirectory();
         ConfigFilePath = Path.Combine(BaseDirectory, "config.json");
         Config = LoadOrCreateConfig();
+        LocalizationService.Instance.LoadLanguage(Config.Language, BaseDirectory);
         EnsureLibraryDirectories();
         SyncWindowsStartup(Config.StartWithWindows);
     }
@@ -52,6 +53,8 @@ public class ConfigService
                 var cfg = JsonSerializer.Deserialize<AppConfig>(json);
                 if (cfg != null)
                 {
+                    if (string.IsNullOrWhiteSpace(cfg.Language))
+                        cfg.Language = LocalizationService.DefaultLanguage;
                     if (string.IsNullOrWhiteSpace(cfg.LibraryPath))
                         cfg.LibraryPath = Path.Combine(BaseDirectory, "GitManagerLibrary");
                     return cfg;
@@ -65,6 +68,7 @@ public class ConfigService
 
         var defaultConfig = new AppConfig
         {
+            Language = LocalizationService.DefaultLanguage,
             LibraryPath = Path.Combine(BaseDirectory, "GitManagerLibrary"),
             CheckIntervalMinutes = 30,
             StartWithWindows = true,

@@ -18,8 +18,6 @@ namespace GitManager;
 
 public partial class MainWindow : Window
 {
-    private const string AllCategoriesOption = "🏷️ Todas as Categorias";
-
     private readonly ConfigService _configService;
     private readonly GitHubService _gitHubService;
     private readonly AppSelfUpdateService _selfUpdateService;
@@ -42,12 +40,14 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        AppVersionBadge.Text = $"v{AppSelfUpdateService.CurrentVersion} • Portátil (.zip)";
         ReposItemsControl.ItemsSource = DisplayedRepositories;
 
+        ApplyLocalizedDynamicLabels();
         RefreshCategorySelectors();
         RefreshRepositoryList();
         UpdateFooterInfo();
+
+        LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
 
         ConfigureBackgroundTimer();
 
@@ -59,6 +59,22 @@ public partial class MainWindow : Window
                 await SyncAllRepositoriesAsync(forceNotification: false);
             }
         };
+    }
+
+    private void OnLanguageChanged()
+    {
+        ApplyLocalizedDynamicLabels();
+        RefreshCategorySelectors();
+        foreach (var r in _configService.Config.Repositories)
+            r.NotifyVersionsChanged();
+        RefreshRepositoryList();
+        UpdateFooterInfo();
+    }
+
+    private void ApplyLocalizedDynamicLabels()
+    {
+        AppVersionBadge.Text = $"v{AppSelfUpdateService.CurrentVersion} • {LocalizationService.Instance["PortableBadgeSuffix"]}";
+        FooterStatusText.Text = LocalizationService.Instance["FooterReadyStatus"];
     }
 
     private void RefreshCategorySelectors()
@@ -73,31 +89,30 @@ public partial class MainWindow : Window
             }
         }
 
+        var defaultCat = LocalizationService.Instance["DefaultCategoryGeneral"];
         var currentNewCat = NewRepoCategoryCombo?.Text;
         if (NewRepoCategoryCombo != null)
         {
             NewRepoCategoryCombo.ItemsSource = null;
             NewRepoCategoryCombo.ItemsSource = categories;
-            NewRepoCategoryCombo.Text = string.IsNullOrWhiteSpace(currentNewCat) ? "Geral" : currentNewCat;
+            NewRepoCategoryCombo.Text = string.IsNullOrWhiteSpace(currentNewCat) ? defaultCat : currentNewCat;
         }
 
         if (CategoryFilterCombo != null)
         {
-            var prevFilter = CategoryFilterCombo.SelectedItem as string;
-            var filterList = new System.Collections.Generic.List<string> { AllCategoriesOption };
+            int prevIdx = CategoryFilterCombo.SelectedIndex;
+            var allLabel = LocalizationService.Instance["AllCategoriesFilter"];
+            var filterList = new System.Collections.Generic.List<string> { allLabel };
             filterList.AddRange(categories);
             CategoryFilterCombo.ItemsSource = filterList;
 
-            if (!string.IsNullOrEmpty(prevFilter) && filterList.Contains(prevFilter))
-                CategoryFilterCombo.SelectedItem = prevFilter;
-            else
-                CategoryFilterCombo.SelectedIndex = 0;
+            CategoryFilterCombo.SelectedIndex = (prevIdx >= 0 && prevIdx < filterList.Count) ? prevIdx : 0;
         }
     }
 
     private void EnsureCategoryExists(string category)
     {
-        var clean = string.IsNullOrWhiteSpace(category) ? "Geral" : category.Trim();
+        var clean = string.IsNullOrWhiteSpace(category) ? LocalizationService.Instance["DefaultCategoryGeneral"] : category.Trim();
         if (!_configService.Config.Categories.Any(c => string.Equals(c, clean, StringComparison.OrdinalIgnoreCase)))
         {
             _configService.Config.Categories.Add(clean);
@@ -130,7 +145,7 @@ public partial class MainWindow : Window
         var res = await _selfUpdateService.CheckForAppUpdateAsync();
         if (res.HasUpdate)
         {
-            _showBalloon("Nova versão do GitManager disponível!", $"Baixando e atualizando para v{res.LatestVersion}...");
+            _showBalloon("GitManager Update", $"Downloading v{res.LatestVersion}...");
             await _selfUpdateService.DownloadAndApplyUpdateAsync(res);
         }
     }
@@ -141,7 +156,10 @@ public partial class MainWindow : Window
 
         var filter = SearchInput?.Text?.Trim() ?? string.Empty;
         var selectedCatFilter = CategoryFilterCombo?.SelectedItem as string;
-        bool filterByCategory = !string.IsNullOrEmpty(selectedCatFilter) && selectedCatFilter != AllCategoriesOption;
+        var allLabel = LocalizationService.Instance["AllCategoriesFilter"];
+        bool filterByCategory = !string.IsNullOrEmpty(selectedCatFilter) &&
+                                selectedCatFilter != allLabel &&
+                                CategoryFilterCombo?.SelectedIndex > 0;
 
         var query = _configService.Config.Repositories.AsEnumerable();
 
@@ -196,7 +214,10 @@ public partial class MainWindow : Window
 
     private void UpdateFooterInfo()
     {
-        FooterLibraryPathText.Text = $"Pasta de Bibliotecas (.zip): {_configService.Config.LibraryPath}";
+        if (FooterLibraryPathText != null && _configService?.Config != null)
+        {
+            FooterLibraryPathText.Text = $"{LocalizationService.Instance["FooterLibraryPathPrefix"]} {_configService.Config.LibraryPath}";
+        }
     }
 
     private async void AddRepo_Click(object sender, RoutedEventArgs e)
@@ -221,15 +242,15 @@ public partial class MainWindow : Window
         if (!GitHubService.TryParseGitHubUrl(rawUrl, out var owner, out var repoName))
         {
             System.Windows.MessageBox.Show(
-                "Informe uma URL válida do GitHub.\nExemplo: https://github.com/usuario/repositorio",
-                "URL Inválida",
+                LocalizationService.Instance["MsgInvalidUrlBody"],
+                LocalizationService.Instance["MsgInvalidUrlTitle"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
         }
 
         var chosenCategory = string.IsNullOrWhiteSpace(NewRepoCategoryCombo.Text)
-            ? "Geral"
+            ? LocalizationService.Instance["DefaultCategoryGeneral"]
             : NewRepoCategoryCombo.Text.Trim();
         EnsureCategoryExists(chosenCategory);
 
@@ -244,8 +265,8 @@ public partial class MainWindow : Window
             _configService.SaveConfig();
             RefreshRepositoryList();
             System.Windows.MessageBox.Show(
-                $"O repositório '{owner}/{repoName}' já está na sua biblioteca (categoria atualizada para '{chosenCategory}'). Vamos verificar se há nova versão para ele!",
-                "Já Adicionado",
+                LocalizationService.Instance.Format("MsgAlreadyAddedBody", $"{owner}/{repoName}", chosenCategory),
+                LocalizationService.Instance["MsgAlreadyAddedTitle"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             RepoUrlInput.Text = string.Empty;
@@ -259,8 +280,8 @@ public partial class MainWindow : Window
             Name = repoName,
             RepoUrl = canonicalUrl,
             Category = chosenCategory,
-            Description = "Buscando metadados e empacotando versão .zip do GitHub...",
-            StatusMessage = "Adicionando..."
+            Description = LocalizationService.Instance["StatusCheckingGitHub"],
+            StatusMessage = LocalizationService.Instance["StatusAdding"]
         };
 
         newItem.FolderPath = _configService.GetRepositoryFolder(newItem);
@@ -295,7 +316,6 @@ public partial class MainWindow : Window
                 item.Category = capturedCat;
                 _configService.SaveConfig();
                 RefreshRepositoryList();
-                FooterStatusText.Text = $"Categoria de '{item.FullName}' alterada para '{capturedCat}'.";
             };
             menu.Items.Add(menuItem);
         }
@@ -304,7 +324,7 @@ public partial class MainWindow : Window
 
         var newCatItem = new MenuItem
         {
-            Header = "➕ Criar Nova Categoria..."
+            Header = LocalizationService.Instance["NewCategoryMenuHeader"]
         };
         newCatItem.Click += (_, _) =>
         {
@@ -315,7 +335,6 @@ public partial class MainWindow : Window
                 item.Category = customCat;
                 _configService.SaveConfig();
                 RefreshRepositoryList();
-                FooterStatusText.Text = $"Nova categoria '{customCat}' aplicada a '{item.FullName}'.";
             }
         };
         menu.Items.Add(newCatItem);
@@ -328,7 +347,7 @@ public partial class MainWindow : Window
     {
         var dialog = new Window
         {
-            Title = "Nova Categoria",
+            Title = LocalizationService.Instance["NewCategoryModalTitle"],
             Width = 380,
             Height = 195,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -341,7 +360,7 @@ public partial class MainWindow : Window
         var root = new StackPanel { Margin = new Thickness(20) };
         root.Children.Add(new TextBlock
         {
-            Text = "Digite o nome da categoria para este card:",
+            Text = LocalizationService.Instance["NewCategoryPromptLabel"],
             FontSize = 13,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 10),
@@ -365,7 +384,7 @@ public partial class MainWindow : Window
 
         var cancelBtn = new System.Windows.Controls.Button
         {
-            Content = "Cancelar",
+            Content = LocalizationService.Instance["CancelBtn"],
             Style = (Style)System.Windows.Application.Current.FindResource("SecondaryButton"),
             Width = 90,
             Margin = new Thickness(0, 0, 8, 0)
@@ -374,7 +393,7 @@ public partial class MainWindow : Window
 
         var okBtn = new System.Windows.Controls.Button
         {
-            Content = "Salvar",
+            Content = LocalizationService.Instance["SaveBtn"],
             Style = (Style)System.Windows.Application.Current.FindResource("PrimaryButton"),
             Width = 100,
             IsDefault = true
@@ -398,7 +417,7 @@ public partial class MainWindow : Window
 
     private async Task SyncRepositoryItemAsync(RepositoryItem item, bool forceDownload)
     {
-        FooterStatusText.Text = $"Sincronizando {item.FullName}...";
+        FooterStatusText.Text = $"Syncing {item.FullName}...";
         var (updated, msg) = await _gitHubService.SyncRepositoryAsync(item, forceDownload);
         _configService.SaveConfig();
         RefreshRepositoryList();
@@ -406,7 +425,7 @@ public partial class MainWindow : Window
 
         if (updated)
         {
-            _showBalloon($"Repositório atualizado (.zip): {item.FullName}", msg);
+            _showBalloon($"Repository updated (.zip): {item.FullName}", msg);
         }
     }
 
@@ -420,7 +439,6 @@ public partial class MainWindow : Window
 
         try
         {
-            FooterStatusText.Text = "Verificando atualizações em todos os repositórios da biblioteca...";
             foreach (var repo in _configService.Config.Repositories.ToList())
             {
                 _configService.ReconcileFolderZipFiles(repo);
@@ -431,14 +449,14 @@ public partial class MainWindow : Window
             _configService.SaveConfig();
             RefreshRepositoryList();
             var summary = updatedCount > 0
-                ? $"{updatedCount} nova(s) versão(ões) .zip baixada(s) com sucesso!"
-                : "Todos os repositórios já estão na versão .zip mais recente.";
+                ? $"{updatedCount} new .zip version(s) downloaded!"
+                : $"{LocalizationService.Instance["StatusUpToDate"]} ({DateTime.Now:HH:mm:ss})";
 
-            FooterStatusText.Text = $"{summary} (Última checagem: {DateTime.Now:HH:mm:ss})";
+            FooterStatusText.Text = summary;
 
             if (updatedCount > 0 || forceNotification)
             {
-                _showBalloon("GitManager — Sincronização Concluída", summary);
+                _showBalloon("GitManager", summary);
             }
         }
         finally
@@ -497,8 +515,8 @@ public partial class MainWindow : Window
         if (selectedZip == null || !File.Exists(selectedZip.FullPath))
         {
             System.Windows.MessageBox.Show(
-                "Ainda não há nenhum arquivo .zip baixado para este repositório. Clique em '🔄 Baixar' primeiro.",
-                "Versão .zip não encontrada",
+                LocalizationService.Instance["MsgNoZipFoundBody"],
+                LocalizationService.Instance["MsgNoZipFoundTitle"],
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -506,7 +524,7 @@ public partial class MainWindow : Window
 
         using var folderDialog = new Forms.FolderBrowserDialog
         {
-            Description = $"Escolha a pasta onde o projeto '{item.Name}' ({selectedZip.DisplayTitle}) será extraído",
+            Description = LocalizationService.Instance.Format("MsgSelectProjectFolderDesc", item.Name, selectedZip.DisplayTitle),
             UseDescriptionForTitle = true,
             ShowNewFolderButton = true
         };
@@ -518,31 +536,28 @@ public partial class MainWindow : Window
 
         if (Directory.Exists(targetFolder) && Directory.EnumerateFileSystemEntries(targetFolder).Any())
         {
+            var subPath = Path.Combine(targetFolder, item.Name);
             var choice = System.Windows.MessageBox.Show(
-                $"A pasta escolhida não está vazia.\n\nDeseja criar uma subpasta '{item.Name}' dentro dela?\n• Sim = Extrair em '{Path.Combine(targetFolder, item.Name)}'\n• Não = Extrair diretamente em '{targetFolder}'",
-                "Criar Projeto a partir do .zip",
+                LocalizationService.Instance.Format("MsgFolderNotEmptyBody", item.Name, subPath, targetFolder),
+                LocalizationService.Instance["MsgFolderNotEmptyTitle"],
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
 
             if (choice == MessageBoxResult.Cancel)
                 return;
             if (choice == MessageBoxResult.Yes)
-                targetFolder = Path.Combine(targetFolder, item.Name);
+                targetFolder = subPath;
         }
 
         try
         {
-            item.StatusMessage = "Extraindo projeto...";
-            FooterStatusText.Text = $"Criando projeto '{item.Name}' em '{targetFolder}' a partir de {selectedZip.FileName}...";
-
+            item.StatusMessage = LocalizationService.Instance["StatusExtracting"];
             await _gitHubService.CreateProjectFromZipAsync(selectedZip, targetFolder);
-
-            item.StatusMessage = "Projeto criado!";
-            FooterStatusText.Text = $"Projeto criado com sucesso em: {targetFolder}";
+            item.StatusMessage = LocalizationService.Instance["StatusProjectCreated"];
 
             var openExplorer = System.Windows.MessageBox.Show(
-                $"Projeto criado com sucesso a partir de '{selectedZip.FileName}'!\n\nLocal: {targetFolder}\n(O arquivo .zip original permanece intacto na sua GitManagerLibrary).\n\nDeseja abrir a pasta do novo projeto agora?",
-                "Projeto Criado com Sucesso",
+                LocalizationService.Instance.Format("MsgProjectCreatedBody", selectedZip.FileName, targetFolder),
+                LocalizationService.Instance["MsgProjectCreatedTitle"],
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
 
@@ -553,10 +568,10 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            item.StatusMessage = "Erro ao extrair";
+            item.StatusMessage = LocalizationService.Instance["StatusExtractError"];
             System.Windows.MessageBox.Show(
-                $"Erro ao criar projeto a partir do .zip:\n{ex.Message}",
-                "Erro",
+                ex.Message,
+                "Error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -590,8 +605,8 @@ public partial class MainWindow : Window
             return;
 
         var res = System.Windows.MessageBox.Show(
-            $"Deseja remover '{item.FullName}' do monitoramento?\n\n• Clique em 'Sim' para remover apenas do painel (mantendo os arquivos .zip na pasta GitManagerLibrary).\n• Clique em 'Não' para cancelar.",
-            "Remover Repositório",
+            LocalizationService.Instance.Format("MsgRemoveRepoBody", item.FullName),
+            LocalizationService.Instance["MsgRemoveRepoTitle"],
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
@@ -600,7 +615,6 @@ public partial class MainWindow : Window
             _configService.Config.Repositories.Remove(item);
             _configService.SaveConfig();
             RefreshRepositoryList();
-            FooterStatusText.Text = $"Repositório {item.FullName} removido da lista (arquivos .zip preservados na pasta).";
         }
     }
 
@@ -621,7 +635,6 @@ public partial class MainWindow : Window
             ConfigureBackgroundTimer();
             UpdateFooterInfo();
             RefreshRepositoryList();
-            FooterStatusText.Text = "Configurações atualizadas e salvas.";
         }
     }
 
@@ -653,8 +666,8 @@ public partial class MainWindow : Window
             e.Cancel = true;
             Hide();
             _showBalloon(
-                "GitManager continua na bandeja",
-                "Seus repositórios .zip continuam sendo monitorados e atualizados em segundo plano.");
+                LocalizationService.Instance["TrayMinimizedTitle"],
+                LocalizationService.Instance["TrayMinimizedMsg"]);
         }
         else
         {

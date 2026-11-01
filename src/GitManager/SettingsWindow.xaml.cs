@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using GitManager.Services;
 using Forms = System.Windows.Forms;
 
@@ -24,13 +25,16 @@ public partial class SettingsWindow : Window
         StartWithWindowsCheck.IsChecked = cfg.StartWithWindows;
         MinimizeToTrayCheck.IsChecked = cfg.MinimizeToTrayOnClose;
         GitHubTokenBox.Text = cfg.GitHubToken;
+
+        var currentLang = string.IsNullOrWhiteSpace(cfg.Language) ? LocalizationService.DefaultLanguage : cfg.Language;
+        LanguageComboBox.SelectedIndex = currentLang.Equals("pt_BR", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
     }
 
     private void BrowseLibraryFolder_Click(object sender, RoutedEventArgs e)
     {
         using var dialog = new Forms.FolderBrowserDialog
         {
-            Description = "Escolha a pasta onde a biblioteca GitManagerLibrary ficará armazenada",
+            Description = LocalizationService.Instance["SettingsLibraryPathLabel"],
             SelectedPath = LibraryPathBox.Text,
             UseDescriptionForTitle = true
         };
@@ -47,7 +51,7 @@ public partial class SettingsWindow : Window
         _configService.SaveConfig();
 
         CheckAppUpdateBtn.IsEnabled = false;
-        UpdateStatusText.Text = $"Verificando atualizações (versão atual: v{AppSelfUpdateService.CurrentVersion})...";
+        UpdateStatusText.Text = $"Checking for updates (v{AppSelfUpdateService.CurrentVersion})...";
 
         try
         {
@@ -55,25 +59,24 @@ public partial class SettingsWindow : Window
             if (res.HasUpdate)
             {
                 var confirm = System.Windows.MessageBox.Show(
-                    $"Nova versão do GitManager encontrada: v{res.LatestVersion}!\n\nNotas:\n{res.ReleaseNotes}\n\nDeseja baixar e atualizar o aplicativo agora?",
-                    "Atualização Disponível",
+                    $"New GitManager version found: v{res.LatestVersion}!\n\n{res.ReleaseNotes}\n\nUpdate now?",
+                    "Update Available",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
                 if (confirm == MessageBoxResult.Yes)
                 {
-                    UpdateStatusText.Text = "Baixando e aplicando atualização...";
                     var applyRes = await _selfUpdateService.DownloadAndApplyUpdateAsync(res);
                     UpdateStatusText.Text = applyRes.Message;
                 }
                 else
                 {
-                    UpdateStatusText.Text = $"Nova versão v{res.LatestVersion} disponível.";
+                    UpdateStatusText.Text = $"v{res.LatestVersion} available.";
                 }
             }
             else
             {
-                UpdateStatusText.Text = $"Você já está na versão mais recente (v{res.CurrentVersion}). {res.ReleaseNotes}";
+                UpdateStatusText.Text = $"Up to date (v{res.CurrentVersion}).";
             }
         }
         finally
@@ -93,10 +96,16 @@ public partial class SettingsWindow : Window
         else
             cfg.CheckIntervalMinutes = 30;
 
+        if (LanguageComboBox.SelectedItem is ComboBoxItem { Tag: string selectedLang })
+            cfg.Language = selectedLang;
+        else
+            cfg.Language = LocalizationService.DefaultLanguage;
+
         cfg.StartWithWindows = StartWithWindowsCheck.IsChecked == true;
         cfg.MinimizeToTrayOnClose = MinimizeToTrayCheck.IsChecked == true;
         cfg.GitHubToken = GitHubTokenBox.Text.Trim();
 
+        LocalizationService.Instance.LoadLanguage(cfg.Language, _configService.BaseDirectory);
         _configService.EnsureLibraryDirectories();
         _configService.SyncWindowsStartup(cfg.StartWithWindows);
         _configService.SaveConfig();

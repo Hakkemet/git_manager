@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:svc="clr-namespace:GitManager.Services"
         mc:Ignorable="d"
-        Title="GitManager — Biblioteca de Repositórios GitHub (.zip)"
+        Title="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AppTitle]}"
         Width="1360" Height="800"
         MinWidth="960" MinHeight="580"
         WindowStartupLocation="CenterScreen"
@@ -36,20 +37,24 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="GitManager" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                             <Border Background="#1E293B" CornerRadius="6" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="AppVersionBadge" Text="v1.0.0 • Portátil (.zip)" FontSize="11" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="AppVersionBadge" Text="v1.1.0 • Portable (.zip)" FontSize="11" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold"/>
                             </Border>
                         </StackPanel>
-                        <TextBlock Text="Biblioteca automática de repositórios GitHub salvos e versionados exclusivamente em arquivos .zip"
+                        <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AppSubtitle]}"
                                    FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Ações Globais -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="📂 Abrir GitManagerLibrary" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="OpenLibraryRoot_Click"
-                            ToolTip="Abre a pasta principal onde todas as pastas de repositórios e versões .zip ficam salvas"/>
-                    <Button x:Name="SyncAllBtn" Content="🔄 Atualizar Todos Agora" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="SyncAll_Click"/>
-                    <Button Content="⚙️ Configurações" Style="{StaticResource SecondaryButton}" Click="OpenSettings_Click"/>
+                    <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryBtn]}"
+                            Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="OpenLibraryRoot_Click"
+                            ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryTooltip]}"/>
+                    <Button x:Name="SyncAllBtn"
+                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SyncAllBtn]}"
+                            Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="SyncAll_Click"/>
+                    <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsBtn]}"
+                            Style="{StaticResource SecondaryButton}" Click="OpenSettings_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -73,7 +78,7 @@
                              KeyDown="RepoUrlInput_KeyDown"
                              TextChanged="RepoUrlInput_TextChanged"/>
                     <TextBlock x:Name="RepoUrlPlaceholder"
-                               Text="Cole a URL do GitHub (ex: https://github.com/usuario/repo)..."
+                               Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[RepoUrlPlaceholder]}"
                                Foreground="{StaticResource TextMutedBrush}" FontSize="12.5"
                                Margin="14,0,14,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
@@ -81,14 +86,15 @@
                 <!-- Categoria ao Adicionar -->
                 <ComboBox Grid.Column="1" x:Name="NewRepoCategoryCombo"
                           IsEditable="True"
-                          Text="Geral"
+                          Text="General"
                           FontSize="12.5"
                           Padding="10,7"
                           Margin="8,0,0,0"
                           VerticalContentAlignment="Center"
-                          ToolTip="Escolha ou digite uma nova categoria para classificar o repositório"/>
+                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CategoryComboTooltip]}"/>
 
-                <Button Grid.Column="2" x:Name="AddRepoBtn" Content="➕ Adicionar"
+                <Button Grid.Column="2" x:Name="AddRepoBtn"
+                        Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AddRepoBtn]}"
                         Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="AddRepo_Click"/>
 
                 <!-- Filtro por Categoria -->
@@ -98,22 +104,22 @@
                           Margin="0,0,8,0"
                           VerticalContentAlignment="Center"
                           SelectionChanged="CategoryFilterCombo_SelectionChanged"
-                          ToolTip="Filtrar cards por categoria"/>
+                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CategoryFilterTooltip]}"/>
 
-                <!-- Ordenação (Recentes, Estrelas, A-Z, Z-A, Tamanho Maior/Menor) -->
+                <!-- Ordenação -->
                 <ComboBox Grid.Column="5" x:Name="SortFilterCombo"
                           FontSize="12.5"
                           Padding="10,7"
                           Margin="0,0,8,0"
                           VerticalContentAlignment="Center"
                           SelectionChanged="SortFilterCombo_SelectionChanged"
-                          ToolTip="Ordenar repositórios por Recentes, Estrelas, A-Z, Z-A ou Tamanho">
-                    <ComboBoxItem Content="🕒 Recentes" IsSelected="True"/>
-                    <ComboBoxItem Content="⭐ Estrelas"/>
-                    <ComboBoxItem Content="🔤 Nome (A-Z)"/>
-                    <ComboBoxItem Content="🔤 Nome (Z-A)"/>
-                    <ComboBoxItem Content="📦 Tamanho (Maior)"/>
-                    <ComboBoxItem Content="📦 Tamanho (Menor)"/>
+                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortFilterTooltip]}">
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortRecent]}" IsSelected="True"/>
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortStars]}"/>
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortNameAsc]}"/>
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortNameDesc]}"/>
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortSizeDesc]}"/>
+                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortSizeAsc]}"/>
                 </ComboBox>
 
                 <!-- Filtro de busca por texto -->
@@ -121,7 +127,7 @@
                     <TextBox x:Name="SearchInput" Style="{StaticResource ModernTextBox}"
                              TextChanged="SearchInput_TextChanged"/>
                     <TextBlock x:Name="SearchPlaceholder"
-                               Text="🔍 Buscar nome, categoria ou descrição..."
+                               Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SearchPlaceholder]}"
                                Foreground="{StaticResource TextMutedBrush}" FontSize="12.5"
                                Margin="14,0,14,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
@@ -136,9 +142,10 @@
                     MaxWidth="560" MaxHeight="270" Padding="32" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="📦" FontSize="42" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="Sua biblioteca GitManagerLibrary está pronta!" FontSize="17" FontWeight="Bold"
+                    <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateTitle]}"
+                               FontSize="17" FontWeight="Bold"
                                Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Adicione a URL de qualquer repositório do GitHub no campo acima e escolha sua categoria. O aplicativo baixará o pacote .zip automaticamente para a pasta do repositório e manterá todas as versões salvas."
+                    <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateDesc]}"
                                FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
                                TextAlignment="Center" Margin="0,8,0,0"/>
                 </StackPanel>
@@ -183,7 +190,7 @@
                                                 Cursor="Hand"
                                                 Tag="{Binding}"
                                                 Click="ChangeCategoryBadge_Click"
-                                                ToolTip="Clique para alterar ou criar uma nova categoria para este repositório"
+                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardChangeCategoryTooltip]}"
                                                 BorderThickness="0"
                                                 Background="Transparent"
                                                 Padding="0">
@@ -212,7 +219,7 @@
                                         <Button Grid.Column="1" Content="🗑️" Style="{StaticResource SecondaryButton}"
                                                 Padding="6,3" FontSize="11" Margin="6,0,0,0"
                                                 Tag="{Binding}" Click="RemoveRepo_Click"
-                                                ToolTip="Remover da biblioteca"/>
+                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardRemoveTooltip]}"/>
                                     </Grid>
 
                                     <!-- Linha 1: Nome do Repositório Clicável (Abre Modal com Detalhes e Notas) -->
@@ -222,7 +229,7 @@
                                             Cursor="Hand"
                                             HorizontalAlignment="Left"
                                             Margin="0,0,0,6"
-                                            ToolTip="Clique para abrir todos os detalhes e notas de atualização deste repositório">
+                                            ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenDetailsTooltip]}">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -292,7 +299,8 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="📦 Versão (.zip):" FontSize="10.5" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardVersionLabel]}"
+                                                           FontSize="10.5" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding SelectedVersion.FormattedSize, FallbackValue=''}"
                                                            FontSize="10.5" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </Grid>
@@ -306,25 +314,29 @@
 
                                     <!-- Linha 5: Botões de Ação Compactos -->
                                     <StackPanel Grid.Row="5">
-                                        <Button Content="🚀 Criar Projeto" Style="{StaticResource SuccessButton}"
+                                        <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectBtn]}"
+                                                Style="{StaticResource SuccessButton}"
                                                 Padding="10,6" FontSize="12" HorizontalAlignment="Stretch"
                                                 Tag="{Binding}" Click="CreateProject_Click"
                                                 Margin="0,0,0,6"
-                                                ToolTip="Extrai a versão .zip selecionada em uma pasta de projeto escolhida por você"/>
+                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectTooltip]}"/>
 
                                         <UniformGrid Columns="3">
-                                            <Button Content="🔄 Baixar" Style="{StaticResource SecondaryButton}"
+                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncBtn]}"
+                                                    Style="{StaticResource SecondaryButton}"
                                                     Padding="4,5" FontSize="11" Margin="0,0,3,0"
                                                     Tag="{Binding}" Click="SyncSingleRepo_Click"
-                                                    ToolTip="Verificar atualizações e baixar novo .zip"/>
-                                            <Button Content="📂 .zips" Style="{StaticResource SecondaryButton}"
+                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncTooltip]}"/>
+                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsBtn]}"
+                                                    Style="{StaticResource SecondaryButton}"
                                                     Padding="4,5" FontSize="11" Margin="2,0,2,0"
                                                     Tag="{Binding}" Click="OpenRepoFolder_Click"
-                                                    ToolTip="Abrir pasta deste repositório com os arquivos .zip"/>
-                                            <Button Content="🌐 Web" Style="{StaticResource SecondaryButton}"
+                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsTooltip]}"/>
+                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebBtn]}"
+                                                    Style="{StaticResource SecondaryButton}"
                                                     Padding="4,5" FontSize="11" Margin="3,0,0,0"
                                                     Tag="{Binding}" Click="OpenGitHubUrl_Click"
-                                                    ToolTip="Abrir repositório original no GitHub"/>
+                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebTooltip]}"/>
                                         </UniformGrid>
 
                                         <TextBlock Text="{Binding LastCheckedText}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
@@ -346,7 +358,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="FooterStatusText"
-                           Text="Pronto • Monitoramento em segundo plano ativo na bandeja do Windows"
+                           Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[FooterReadyStatus]}"
                            FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1" x:Name="FooterLibraryPathText"
                            FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>

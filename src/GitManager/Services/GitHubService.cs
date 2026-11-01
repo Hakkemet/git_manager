@@ -64,7 +64,7 @@ public class GitHubService
             return (false, "URL do GitHub inválida.");
 
         item.IsUpdating = true;
-        item.StatusMessage = "Consultando GitHub...";
+        item.StatusMessage = LocalizationService.Instance["StatusCheckingGitHub"];
 
         try
         {
@@ -210,12 +210,12 @@ public class GitHubService
             if (alreadyHasCommitZip)
             {
                 item.LatestCommitSha = latestSha;
-                item.StatusMessage = "Atualizado";
-                return (false, "Nenhuma alteração desde a última versão (.zip atual já está salvo).");
+                item.StatusMessage = LocalizationService.Instance["StatusUpToDate"];
+                return (false, LocalizationService.Instance["StatusUpToDate"]);
             }
 
             // 4. Faz o download do repositório completo em formato .zip direto para a pasta do repositório em GitManagerLibrary
-            item.StatusMessage = "Baixando .zip da nova versão...";
+            item.StatusMessage = LocalizationService.Instance["StatusDownloadingZip"];
             var safeTag = SanitizeToken(versionTag);
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var zipFileName = $"{SanitizeToken(repoName)}_{timestamp}_{safeTag}_{shortLatestSha}.zip";

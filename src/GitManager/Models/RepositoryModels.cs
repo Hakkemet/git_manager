@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using GitManager.Services;
 
 namespace GitManager.Models;
 
@@ -110,12 +111,12 @@ public class RepositoryItem : INotifyPropertyChanged
 
     private static (string Bg, string Border, string Text) GetCategoryPalette(string category)
     {
-        var norm = (category ?? "Geral").Trim().ToLowerInvariant();
+        var norm = (category ?? "General").Trim().ToLowerInvariant();
         return norm switch
         {
-            "ia / agentes" or "ia" or "ai" => ("#3B0764", "#A855F7", "#F3E8FF"),
-            "jogos / recomp" or "jogos" or "games" => ("#451A03", "#F59E0B", "#FEF3C7"),
-            "engenharia reversa" or "segurança" or "re" => ("#450A0A", "#EF4444", "#FEE2E2"),
+            "ia / agentes" or "ai / agents" or "ia" or "ai" => ("#3B0764", "#A855F7", "#F3E8FF"),
+            "jogos / recomp" or "games / recomp" or "jogos" or "games" => ("#451A03", "#F59E0B", "#FEF3C7"),
+            "engenharia reversa" or "reverse engineering" or "segurança" or "re" => ("#450A0A", "#EF4444", "#FEE2E2"),
             "ferramentas" or "tools" or "utilitários" => ("#064E3B", "#10B981", "#D1FAE5"),
             "web / frontend" or "web" => ("#0C4A6E", "#38BDF8", "#E0F2FE"),
             "backend / api" or "backend" => ("#1E1B4B", "#6366F1", "#E0E7FF"),
@@ -125,7 +126,7 @@ public class RepositoryItem : INotifyPropertyChanged
 
     private static (string Bg, string Border, string Text) GetDeterministicPalette(string norm)
     {
-        if (norm == "geral" || string.IsNullOrEmpty(norm))
+        if (norm is "geral" or "general" || string.IsNullOrEmpty(norm))
             return ("#1E293B", "#64748B", "#F1F5F9");
 
         var palettes = new (string Bg, string Border, string Text)[]
@@ -200,10 +201,10 @@ public class RepositoryItem : INotifyPropertyChanged
     }
 
     [JsonIgnore]
-    public string LastCheckedText => $"Verificado: {LastCheckedAt:dd/MM HH:mm}";
+    public string LastCheckedText => $"{LocalizationService.Instance["StatusCheckedPrefix"]} {LastCheckedAt:dd/MM HH:mm}";
 
     [JsonIgnore]
-    public string LastUpdatedText => $"Último ZIP: {LastUpdatedAt:dd/MM/yyyy HH:mm}";
+    public string LastUpdatedText => $"{LocalizationService.Instance["StatusLastZipPrefix"]} {LastUpdatedAt:dd/MM/yyyy HH:mm}";
 
     [JsonIgnore]
     public bool IsUpdating
@@ -245,6 +246,8 @@ public class RepositoryItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(Versions));
         OnPropertyChanged(nameof(SelectedVersion));
         OnPropertyChanged(nameof(ActiveNotes));
+        OnPropertyChanged(nameof(LastCheckedText));
+        OnPropertyChanged(nameof(LastUpdatedText));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -254,6 +257,7 @@ public class RepositoryItem : INotifyPropertyChanged
 
 public class AppConfig
 {
+    public string Language { get; set; } = "en_US";
     public string LibraryPath { get; set; } = string.Empty;
     public int CheckIntervalMinutes { get; set; } = 30;
     public bool StartWithWindows { get; set; } = true;
@@ -262,11 +266,11 @@ public class AppConfig
     public string GitHubToken { get; set; } = string.Empty;
     public List<string> Categories { get; set; } = new()
     {
-        "Geral",
-        "IA / Agentes",
-        "Jogos / Recomp",
-        "Engenharia Reversa",
-        "Ferramentas",
+        "General",
+        "AI / Agents",
+        "Games / Recomp",
+        "Reverse Engineering",
+        "Tools",
         "Web / Frontend",
         "Backend / API"
     };
