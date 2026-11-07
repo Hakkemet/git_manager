@@ -265,8 +265,12 @@ public class RepositoryItem : INotifyPropertyChanged
         ? $"🖥️ {(string.IsNullOrWhiteSpace(InstalledVersion) ? "—" : InstalledVersion)}"
         : string.Empty;
 
+    [JsonIgnore]
+    public string VersionCountText => LocalizationService.Instance.Format(Versions.Count == 1 ? "VersionCountOne" : "VersionCount", Versions.Count);
+
     public void NotifyVersionsChanged()
     {
+        OnPropertyChanged(nameof(VersionCountText));
         OnPropertyChanged(nameof(Versions));
         OnPropertyChanged(nameof(SelectedVersion));
         OnPropertyChanged(nameof(ActiveNotes));

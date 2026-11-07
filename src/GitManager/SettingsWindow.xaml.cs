@@ -18,6 +18,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(ConfigService configService, AppSelfUpdateService selfUpdateService)
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
         _configService = configService;
         _selfUpdateService = selfUpdateService;
 

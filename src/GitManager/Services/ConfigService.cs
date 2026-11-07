@@ -248,6 +248,13 @@ public class ConfigService
                 v.FullPath = local;
         }
 
+        // Entradas importadas antes guardavam o nome do arquivo inteiro como tag
+        foreach (var v in repo.Versions)
+        {
+            if (string.Equals(v.VersionTag, Path.GetFileNameWithoutExtension(v.FileName), StringComparison.OrdinalIgnoreCase))
+                v.VersionTag = TagFromZipName(v.FileName);
+        }
+
         // Remove da lista entradas cujo arquivo .zip foi deletado manualmente
         var existingEntries = repo.Versions.Where(v => File.Exists(v.FullPath)).ToList();
 
@@ -265,7 +272,7 @@ public class ConfigService
                 {
                     FileName = fi.Name,
                     FullPath = fi.FullName,
-                    VersionTag = Path.GetFileNameWithoutExtension(fi.Name),
+                    VersionTag = TagFromZipName(fi.Name),
                     CommitSha = System.Text.RegularExpressions.Regex.Match(fi.Name, @"_([0-9a-f]{7,40})\.zip$") is { Success: true } m ? m.Groups[1].Value : "local",
                     ReleaseNotes = "Arquivo .zip encontrado diretamente na pasta do repositório.",
                     // Cópia/backup reseta a data do arquivo; o nome guarda a data real do download
@@ -286,6 +293,13 @@ public class ConfigService
         if (repo.Versions.Count > 0 && string.IsNullOrWhiteSpace(repo.LatestCommitSha) && repo.Versions[0].CommitSha != "local")
             repo.LatestCommitSha = repo.Versions[0].CommitSha;
         repo.NotifyVersionsChanged();
+    }
+
+    /// <summary>"repo_20261107_054812_nx2_0857e8b.zip" → "nx2"; nome fora do padrão → nome sem extensão.</summary>
+    public static string TagFromZipName(string fileName)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(fileName, @"_\d{8}_\d{6}_(.+)_[0-9a-f]{7,40}\.zip$");
+        return m.Success ? m.Groups[1].Value : Path.GetFileNameWithoutExtension(fileName);
     }
 
     public void SyncWindowsStartup(bool enable)

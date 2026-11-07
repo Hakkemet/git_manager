@@ -25,6 +25,11 @@ public partial class MainWindow : Window
 
     public ObservableCollection<RepositoryItem> DisplayedRepositories { get; } = new();
 
+    public record CategoryEntry(string? Key, string Display, int Count, string Color);
+
+    private int _sortIndex;
+    private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(180) };
+
     public MainWindow(
         ConfigService configService,
         GitHubService gitHubService,
@@ -38,7 +43,10 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        ReposItemsControl.ItemsSource = DisplayedRepositories;
+        ReposList.ItemsSource = DisplayedRepositories;
+        ReposList.SelectionChanged += (_, _) => UpdateDetailsVisibility();
+        _searchDebounce.Tick += (_, _) => { _searchDebounce.Stop(); RefreshRepositoryList(); };
+        SourceInitialized += (_, _) => DarkTitleBar.Apply(this);
 
         ApplyLocalizedDynamicLabels();
         RefreshCategorySelectors();
@@ -86,7 +94,7 @@ public partial class MainWindow : Window
 
     private void ApplyLocalizedDynamicLabels()
     {
-        AppVersionBadge.Text = $"v{AppSelfUpdateService.CurrentVersion} • {LocalizationService.Instance["PortableBadgeSuffix"]}";
+        AppVersionBadge.Text = $"v{AppSelfUpdateService.CurrentVersion}";
         FooterStatusText.Text = LocalizationService.Instance["FooterReadyStatus"];
     }
 
@@ -95,33 +103,38 @@ public partial class MainWindow : Window
         var categories = _configService.Config.Categories;
         foreach (var repo in _configService.Config.Repositories)
         {
-            if (!string.IsNullOrWhiteSpace(repo.Category) &&
-                !categories.Any(c => string.Equals(c, repo.Category, StringComparison.OrdinalIgnoreCase)))
-            {
+            if (!categories.Any(c => string.Equals(c, repo.Category, StringComparison.OrdinalIgnoreCase)))
                 categories.Add(repo.Category);
-            }
         }
 
-        var defaultCat = LocalizationService.Instance["DefaultCategoryGeneral"];
-        var currentNewCat = NewRepoCategoryCombo?.Text;
-        if (NewRepoCategoryCombo != null)
+        var prevKey = (CategoryList.SelectedItem as CategoryEntry)?.Key;
+        var repos = _configService.Config.Repositories;
+        var entries = new System.Collections.Generic.List<CategoryEntry>
         {
-            NewRepoCategoryCombo.ItemsSource = null;
-            NewRepoCategoryCombo.ItemsSource = categories;
-            NewRepoCategoryCombo.Text = string.IsNullOrWhiteSpace(currentNewCat) ? defaultCat : currentNewCat;
-        }
-
-        if (CategoryFilterCombo != null)
+            new(null, LocalizationService.Instance["AllCategoriesFilter"], repos.Count, "#94A3B8")
+        };
+        foreach (var cat in categories)
         {
-            int prevIdx = CategoryFilterCombo.SelectedIndex;
-            var allLabel = LocalizationService.Instance["AllCategoriesFilter"];
-            var filterList = new System.Collections.Generic.List<string> { allLabel };
-            filterList.AddRange(categories);
-            CategoryFilterCombo.ItemsSource = filterList;
-
-            CategoryFilterCombo.SelectedIndex = (prevIdx >= 0 && prevIdx < filterList.Count) ? prevIdx : 0;
+            var count = repos.Count(r => string.Equals(r.Category, cat, StringComparison.OrdinalIgnoreCase));
+            var color = new RepositoryItem { Category = cat }.CategoryBorderColor;
+            entries.Add(new CategoryEntry(cat, cat, count, color));
         }
+
+        _suppressCategoryEvent = true;
+        CategoryList.ItemsSource = entries;
+        CategoryList.SelectedItem = entries.FirstOrDefault(e => e.Key == prevKey) ?? entries[0];
+        _suppressCategoryEvent = false;
     }
+
+    private bool _suppressCategoryEvent;
+
+    private void CategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_suppressCategoryEvent)
+            RefreshRepositoryList();
+    }
+
+    private string? SelectedCategoryKey => (CategoryList?.SelectedItem as CategoryEntry)?.Key;
 
     private void EnsureCategoryExists(string category)
     {
@@ -149,21 +162,14 @@ public partial class MainWindow : Window
 
     private void RefreshRepositoryList()
     {
-        if (DisplayedRepositories == null || _configService?.Config == null) return;
+        if (DisplayedRepositories == null || _configService?.Config == null || ReposList == null) return;
 
         var filter = SearchInput?.Text?.Trim() ?? string.Empty;
-        var selectedCatFilter = CategoryFilterCombo?.SelectedItem as string;
-        var allLabel = LocalizationService.Instance["AllCategoriesFilter"];
-        bool filterByCategory = !string.IsNullOrEmpty(selectedCatFilter) &&
-                                selectedCatFilter != allLabel &&
-                                CategoryFilterCombo?.SelectedIndex > 0;
-
+        var category = SelectedCategoryKey;
         var query = _configService.Config.Repositories.AsEnumerable();
 
-        if (filterByCategory)
-        {
-            query = query.Where(r => string.Equals(r.Category, selectedCatFilter, StringComparison.OrdinalIgnoreCase));
-        }
+        if (category != null)
+            query = query.Where(r => string.Equals(r.Category, category, StringComparison.OrdinalIgnoreCase));
 
         if (!string.IsNullOrEmpty(filter))
         {
@@ -174,8 +180,7 @@ public partial class MainWindow : Window
                 repo.Language.Contains(filter, StringComparison.OrdinalIgnoreCase));
         }
 
-        int sortIndex = SortFilterCombo?.SelectedIndex ?? 0;
-        query = sortIndex switch
+        query = _sortIndex switch
         {
             1 => query.OrderByDescending(r => r.StarsCount).ThenBy(r => r.FullName, StringComparer.OrdinalIgnoreCase),
             2 => query.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Owner, StringComparer.OrdinalIgnoreCase),
@@ -185,29 +190,56 @@ public partial class MainWindow : Window
             _ => query.OrderByDescending(r => r.LastUpdatedAt)
         };
 
-        DisplayedRepositories.Clear();
-        foreach (var repo in query)
+        var selected = ReposList.SelectedItem;
+        var list = query.ToList();
+
+        // Só mexe na coleção se a lista mudou: evita recriar linhas (e piscar) a cada sync/salvamento
+        if (!list.SequenceEqual(DisplayedRepositories))
         {
-            DisplayedRepositories.Add(repo);
+            DisplayedRepositories.Clear();
+            foreach (var repo in list)
+                DisplayedRepositories.Add(repo);
         }
 
+        ReposList.SelectedItem = selected != null && list.Contains(selected) ? selected : list.FirstOrDefault();
+
         if (EmptyStatePanel != null)
+            EmptyStatePanel.Visibility = _configService.Config.Repositories.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateSortLabel();
+        UpdateDetailsVisibility();
+    }
+
+    private void UpdateDetailsVisibility()
+    {
+        var has = ReposList.SelectedItem != null;
+        DetailsPanel.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        DetailsEmptyText.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static readonly string[] SortKeys = { "SortRecent", "SortStars", "SortNameAsc", "SortNameDesc", "SortSizeDesc", "SortSizeAsc" };
+
+    private void UpdateSortLabel() => SortBtn.Content = LocalizationService.Instance[SortKeys[_sortIndex]];
+
+    private void SortBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+        for (int i = 0; i < SortKeys.Length; i++)
         {
-            EmptyStatePanel.Visibility = _configService.Config.Repositories.Count == 0
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            var idx = i;
+            var mi = new MenuItem { Header = LocalizationService.Instance[SortKeys[i]], IsChecked = i == _sortIndex };
+            mi.Click += (_, _) => { _sortIndex = idx; RefreshRepositoryList(); };
+            menu.Items.Add(mi);
         }
+        menu.PlacementTarget = SortBtn;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
     }
 
     private static long GetRepoActiveZipSizeBytes(RepositoryItem repo) =>
         repo.SelectedVersion?.FileSizeBytes
         ?? repo.Versions.FirstOrDefault()?.FileSizeBytes
         ?? 0L;
-
-    private void SortFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        RefreshRepositoryList();
-    }
 
     private void UpdateFooterInfo()
     {
@@ -246,9 +278,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var chosenCategory = string.IsNullOrWhiteSpace(NewRepoCategoryCombo.Text)
-            ? LocalizationService.Instance["DefaultCategoryGeneral"]
-            : NewRepoCategoryCombo.Text.Trim();
+        // Entra na categoria aberta na barra lateral
+        var chosenCategory = SelectedCategoryKey ?? LocalizationService.Instance["DefaultCategoryGeneral"];
         EnsureCategoryExists(chosenCategory);
 
         var canonicalUrl = $"https://github.com/{owner}/{repoName}";
@@ -288,7 +319,10 @@ public partial class MainWindow : Window
         _configService.SaveConfig();
 
         RepoUrlInput.Text = string.Empty;
+        RefreshCategorySelectors();
         RefreshRepositoryList();
+        ReposList.SelectedItem = newItem;
+        ReposList.ScrollIntoView(newItem);
 
         await SyncRepositoryItemAsync(newItem, forceDownload: true);
     }
@@ -312,6 +346,7 @@ public partial class MainWindow : Window
             {
                 item.Category = capturedCat;
                 _configService.SaveConfig();
+                RefreshCategorySelectors();
                 RefreshRepositoryList();
             };
             menu.Items.Add(menuItem);
@@ -331,6 +366,7 @@ public partial class MainWindow : Window
                 EnsureCategoryExists(customCat);
                 item.Category = customCat;
                 _configService.SaveConfig();
+                RefreshCategorySelectors();
                 RefreshRepositoryList();
             }
         };
@@ -407,11 +443,6 @@ public partial class MainWindow : Window
         return dialog.ShowDialog() == true ? textBox.Text.Trim() : null;
     }
 
-    private void CategoryFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        RefreshRepositoryList();
-    }
-
     private async Task SyncRepositoryItemAsync(RepositoryItem item, bool forceDownload)
     {
         FooterStatusText.Text = $"Syncing {item.FullName}...";
@@ -482,22 +513,6 @@ public partial class MainWindow : Window
         _configService.ReconcileFolderZipFiles(item);
         bool force = item.Versions.Count == 0;
         await SyncRepositoryItemAsync(item, forceDownload: force);
-    }
-
-    private void OpenRepoDetails_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not System.Windows.Controls.Button { Tag: RepositoryItem item })
-            return;
-
-        var modal = new RepositoryDetailsWindow(
-            item,
-            _configService,
-            TriggerSyncForRepoAsync,
-            PromptAndCreateProjectAsync)
-        {
-            Owner = this
-        };
-        modal.ShowDialog();
     }
 
     private async void CreateProject_Click(object sender, RoutedEventArgs e)
@@ -711,6 +726,7 @@ public partial class MainWindow : Window
         {
             _configService.Config.Repositories.Remove(item);
             _configService.SaveConfig();
+            RefreshCategorySelectors();
             RefreshRepositoryList();
         }
     }
@@ -753,7 +769,8 @@ public partial class MainWindow : Window
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
-        RefreshRepositoryList();
+        _searchDebounce.Stop();
+        _searchDebounce.Start();
     }
 
     private void Window_Closing(object sender, CancelEventArgs e)

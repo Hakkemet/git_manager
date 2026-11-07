@@ -1,378 +1,283 @@
 <Window x:Class="GitManager.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:svc="clr-namespace:GitManager.Services"
-        mc:Ignorable="d"
         Title="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AppTitle]}"
-        Width="1360" Height="800"
-        MinWidth="960" MinHeight="580"
+        Width="1320" Height="800"
+        MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgPrimaryBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
         Closing="Window_Closing">
-    <Grid>
+    <Grid Background="{StaticResource BgPrimaryBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="248"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="400"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Barra Superior / Header -->
-        <Border Grid.Row="0" Background="{StaticResource BgSecondaryBrush}" BorderBrush="#1E293B" BorderThickness="0,0,0,1" Padding="24,16">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- ============ BARRA LATERAL ============ -->
+        <Border Grid.Column="0" Background="{StaticResource BgSecondaryBrush}" BorderBrush="{StaticResource BorderFaintBrush}" BorderThickness="0,0,1,0">
+            <Grid Margin="16,18,16,14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <!-- Logo + Título -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="40" Height="40" CornerRadius="10" Background="#1E1B4B" BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="1.5" Margin="0,0,14,0">
-                        <TextBlock Text="📦" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <!-- Marca -->
+                <StackPanel Orientation="Horizontal" Margin="4,0,0,20">
+                    <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource AccentPrimaryBrush}">
+                        <TextBlock Text="G" FontSize="18" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="GitManager" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                            <Border Background="#1E293B" CornerRadius="6" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="AppVersionBadge" Text="v1.1.0 • Portable (.zip)" FontSize="11" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold"/>
-                            </Border>
-                        </StackPanel>
-                        <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AppSubtitle]}"
-                                   FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="GitManager" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="AppVersionBadge" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Ações Globais -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryBtn]}"
-                            Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="OpenLibraryRoot_Click"
-                            ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryTooltip]}"/>
-                    <Button x:Name="SyncAllBtn"
-                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SyncAllBtn]}"
-                            Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Click="SyncAll_Click"/>
-                    <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsBtn]}"
-                            Style="{StaticResource SecondaryButton}" Click="OpenSettings_Click"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- Barra de Adição Rápida + Categoria + Ordenação + Filtro -->
-        <Border Grid.Row="1" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="0,0,0,1" Padding="24,12">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.6*"/>
-                    <ColumnDefinition Width="155"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="170"/>
-                    <ColumnDefinition Width="185"/>
-                    <ColumnDefinition Width="1*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Input de URL do GitHub -->
-                <Grid Grid.Column="0">
-                    <TextBox x:Name="RepoUrlInput" Style="{StaticResource ModernTextBox}"
-                             KeyDown="RepoUrlInput_KeyDown"
-                             TextChanged="RepoUrlInput_TextChanged"/>
-                    <TextBlock x:Name="RepoUrlPlaceholder"
-                               Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[RepoUrlPlaceholder]}"
-                               Foreground="{StaticResource TextMutedBrush}" FontSize="12.5"
-                               Margin="14,0,14,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                <!-- Adicionar repositório -->
+                <Grid Grid.Row="1" Margin="0,0,0,6">
+                    <TextBox x:Name="RepoUrlInput" Style="{StaticResource ModernTextBox}" Padding="10,8" FontSize="12.5"
+                             KeyDown="RepoUrlInput_KeyDown" TextChanged="RepoUrlInput_TextChanged"/>
+                    <TextBlock x:Name="RepoUrlPlaceholder" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[RepoUrlPlaceholder]}"
+                               Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="13,0,8,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis"/>
                 </Grid>
+                <Button Grid.Row="2" x:Name="AddRepoBtn" Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AddRepoBtn]}"
+                        Style="{StaticResource PrimaryButton}" Padding="10,8" Margin="0,0,0,22" Click="AddRepo_Click"
+                        ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AddRepoTooltip]}"/>
 
-                <!-- Categoria ao Adicionar -->
-                <ComboBox Grid.Column="1" x:Name="NewRepoCategoryCombo"
-                          IsEditable="True"
-                          Text="General"
-                          FontSize="12.5"
-                          Padding="10,7"
-                          Margin="8,0,0,0"
-                          VerticalContentAlignment="Center"
-                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CategoryComboTooltip]}"/>
-
-                <Button Grid.Column="2" x:Name="AddRepoBtn"
-                        Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[AddRepoBtn]}"
-                        Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="AddRepo_Click"/>
-
-                <!-- Filtro por Categoria -->
-                <ComboBox Grid.Column="4" x:Name="CategoryFilterCombo"
-                          FontSize="12.5"
-                          Padding="10,7"
-                          Margin="0,0,8,0"
-                          VerticalContentAlignment="Center"
-                          SelectionChanged="CategoryFilterCombo_SelectionChanged"
-                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CategoryFilterTooltip]}"/>
-
-                <!-- Ordenação -->
-                <ComboBox Grid.Column="5" x:Name="SortFilterCombo"
-                          FontSize="12.5"
-                          Padding="10,7"
-                          Margin="0,0,8,0"
-                          VerticalContentAlignment="Center"
-                          SelectionChanged="SortFilterCombo_SelectionChanged"
-                          ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortFilterTooltip]}">
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortRecent]}" IsSelected="True"/>
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortStars]}"/>
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortNameAsc]}"/>
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortNameDesc]}"/>
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortSizeDesc]}"/>
-                    <ComboBoxItem Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortSizeAsc]}"/>
-                </ComboBox>
-
-                <!-- Filtro de busca por texto -->
-                <Grid Grid.Column="6">
-                    <TextBox x:Name="SearchInput" Style="{StaticResource ModernTextBox}"
-                             TextChanged="SearchInput_TextChanged"/>
-                    <TextBlock x:Name="SearchPlaceholder"
-                               Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SearchPlaceholder]}"
-                               Foreground="{StaticResource TextMutedBrush}" FontSize="12.5"
-                               Margin="14,0,14,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- Grade de Cards de Repositórios (5 colunas = 20% da largura cada) -->
-        <Grid Grid.Row="2">
-            <!-- Estado Vazio -->
-            <Border x:Name="EmptyStatePanel" Visibility="Collapsed"
-                    Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="14"
-                    MaxWidth="560" MaxHeight="270" Padding="32" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="📦" FontSize="42" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateTitle]}"
-                               FontSize="17" FontWeight="Bold"
-                               Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateDesc]}"
-                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
-                               TextAlignment="Center" Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-
-            <!-- ScrollViewer com Grid de 5 Colunas (20% por card) -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="16,14">
-                <ItemsControl x:Name="ReposItemsControl" VerticalAlignment="Top">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="5" VerticalAlignment="Top"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="{StaticResource BgCardBrush}"
-                                    BorderBrush="{StaticResource BorderSubtleBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="10"
-                                    Padding="12"
-                                    Margin="6"
-                                    VerticalAlignment="Stretch">
+                <!-- Categorias -->
+                <DockPanel Grid.Row="3">
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SidebarCategoriesHeader]}"
+                               FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="8,0,0,8"/>
+                    <ListBox x:Name="CategoryList" Style="{StaticResource FlatListBox}" ItemContainerStyle="{StaticResource NavItem}"
+                             SelectionChanged="CategoryList_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
                                 <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Linha 0: TAG DE CATEGORIA DESTACADA (Clicável) + Botão Excluir -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <Button HorizontalAlignment="Left"
-                                                Cursor="Hand"
-                                                Tag="{Binding}"
-                                                Click="ChangeCategoryBadge_Click"
-                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardChangeCategoryTooltip]}"
-                                                BorderThickness="0"
-                                                Background="Transparent"
-                                                Padding="0">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{Binding CategoryBgColor}"
-                                                            BorderBrush="{Binding CategoryBorderColor}"
-                                                            BorderThickness="1.5"
-                                                            CornerRadius="6"
-                                                            Padding="9,3">
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding CategoryDisplay}"
-                                                                       Foreground="{Binding CategoryTextColor}"
-                                                                       FontSize="10.5"
-                                                                       FontWeight="Bold"/>
-                                                            <TextBlock Text=" ▾"
-                                                                       Foreground="{Binding CategoryTextColor}"
-                                                                       FontSize="10"
-                                                                       VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
-
-                                        <Button Grid.Column="1" Content="🗑️" Style="{StaticResource SecondaryButton}"
-                                                Padding="6,3" FontSize="11" Margin="6,0,0,0"
-                                                Tag="{Binding}" Click="RemoveRepo_Click"
-                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardRemoveTooltip]}"/>
-                                    </Grid>
-
-                                    <!-- Linha 1: Nome do Repositório Clicável (Abre Modal com Detalhes e Notas) -->
-                                    <Button Grid.Row="1"
-                                            Tag="{Binding}"
-                                            Click="OpenRepoDetails_Click"
-                                            Cursor="Hand"
-                                            HorizontalAlignment="Left"
-                                            Margin="0,0,0,6"
-                                            ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenDetailsTooltip]}">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="repoTitleText"
-                                                               Text="{Binding FullName}"
-                                                               FontSize="14"
-                                                               FontWeight="Bold"
-                                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               MaxWidth="200"/>
-                                                    <TextBlock x:Name="infoIcon"
-                                                               Text=" ℹ️"
-                                                               FontSize="11.5"
-                                                               Opacity="0.7"
-                                                               VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="repoTitleText" Property="Foreground" Value="{StaticResource AccentCyanBrush}"/>
-                                                        <Setter TargetName="repoTitleText" Property="TextDecorations" Value="Underline"/>
-                                                        <Setter TargetName="infoIcon" Property="Opacity" Value="1"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-
-                                    <!-- Linha 2: Badges Compactas (Linguagem, Tag, Estrelas, Status) -->
-                                    <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
-                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1"
-                                                CornerRadius="5" Padding="6,1.5" Margin="0,0,5,4">
-                                            <TextBlock Text="{Binding Language}" FontSize="10.5" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold"/>
-                                        </Border>
-
-                                        <Border Background="#1E1B4B" BorderBrush="#4338CA" BorderThickness="1"
-                                                CornerRadius="5" Padding="6,1.5" Margin="0,0,5,4">
-                                            <TextBlock Text="{Binding LatestVersionTag}" FontSize="10.5" Foreground="#A5B4FC" FontWeight="SemiBold"
-                                                       MaxWidth="110" TextTrimming="CharacterEllipsis"/>
-                                        </Border>
-
-                                        <Border Background="#0F172A" CornerRadius="5" Padding="6,1.5" Margin="0,0,5,4">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="★ " Foreground="#FBBF24" FontSize="10.5"/>
-                                                <TextBlock Text="{Binding StarsCount}" Foreground="#E2E8F0" FontSize="10.5"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <TextBlock Text="{Binding StatusMessage}" FontSize="10.5" Foreground="#34D399"
-                                                   FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,0,4"
-                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusMessage}"/>
-                                    </WrapPanel>
-
-                                    <!-- Linha 3: Descrição compacta -->
-                                    <TextBlock Grid.Row="3" Text="{Binding Description}"
-                                               FontSize="11.5" Foreground="#CBD5E1"
-                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                                               Height="34" MaxHeight="34"
-                                               ToolTip="{Binding Description}"
-                                               Margin="0,0,0,10"/>
-
-                                    <!-- Linha 4: Seletor de Versão (.zip) Compacto -->
-                                    <Border Grid.Row="4" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1"
-                                            CornerRadius="7" Padding="8,6" Margin="0,0,0,10">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,4">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardVersionLabel]}"
-                                                           FontSize="10.5" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding SelectedVersion.FormattedSize, FallbackValue=''}"
-                                                           FontSize="10.5" Foreground="{StaticResource AccentCyanBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            </Grid>
-                                            <ComboBox ItemsSource="{Binding Versions}"
-                                                      SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
-                                                      DisplayMemberPath="DisplayTitle"
-                                                      FontSize="11" Padding="6,3"
-                                                      HorizontalAlignment="Stretch"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Linha 5: Botões de Ação Compactos -->
-                                    <StackPanel Grid.Row="5">
-                                        <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectBtn]}"
-                                                Style="{StaticResource SuccessButton}"
-                                                Padding="10,6" FontSize="12" HorizontalAlignment="Stretch"
-                                                Tag="{Binding}" Click="CreateProject_Click"
-                                                Margin="0,0,0,6"
-                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectTooltip]}"/>
-
-                                        <UniformGrid Columns="3">
-                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncBtn]}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="4,5" FontSize="11" Margin="0,0,3,0"
-                                                    Tag="{Binding}" Click="SyncSingleRepo_Click"
-                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncTooltip]}"/>
-                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsBtn]}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="4,5" FontSize="11" Margin="2,0,2,0"
-                                                    Tag="{Binding}" Click="OpenRepoFolder_Click"
-                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsTooltip]}"/>
-                                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebBtn]}"
-                                                    Style="{StaticResource SecondaryButton}"
-                                                    Padding="4,5" FontSize="11" Margin="3,0,0,0"
-                                                    Tag="{Binding}" Click="OpenGitHubUrl_Click"
-                                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebTooltip]}"/>
-                                        </UniformGrid>
-
-                                        <Button Style="{StaticResource SecondaryButton}"
-                                                Padding="4,5" FontSize="11" Margin="0,6,0,0" HorizontalAlignment="Stretch"
-                                                Tag="{Binding}" Click="InstallMenu_Click"
-                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallTooltip]}">
-                                            <Grid>
-                                                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallBtn]}"/>
-                                                <TextBlock Text="{Binding InstallBadgeText}" HorizontalAlignment="Right"
-                                                           Foreground="{StaticResource AccentEmeraldBrush}" Margin="6,0,0,0"/>
-                                            </Grid>
-                                        </Button>
-
-                                        <TextBlock Text="{Binding LastCheckedText}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                                                   HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                                    </StackPanel>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding Color}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Display}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Count}" Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" VerticalAlignment="Center"/>
                                 </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <!-- Ações globais -->
+                <StackPanel Grid.Row="4" Margin="0,12,0,0">
+                    <Button x:Name="SyncAllBtn" Style="{StaticResource GhostButton}" Click="SyncAll_Click"
+                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SyncAllBtn]}"/>
+                    <Button Style="{StaticResource GhostButton}" Click="OpenLibraryRoot_Click"
+                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryBtn]}"
+                            ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[OpenLibraryTooltip]}"/>
+                    <Button Style="{StaticResource GhostButton}" Click="OpenSettings_Click"
+                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsBtn]}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ LISTA ============ -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Margin="20,18,20,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid>
+                    <TextBox x:Name="SearchInput" Style="{StaticResource ModernTextBox}" Padding="10,8" FontSize="13" TextChanged="SearchInput_TextChanged"/>
+                    <TextBlock x:Name="SearchPlaceholder" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SearchPlaceholder]}"
+                               Foreground="{StaticResource TextMutedBrush}" FontSize="12.5" Margin="13,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                </Grid>
+                <Button Grid.Column="1" x:Name="SortBtn" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Padding="12,8"
+                        Click="SortBtn_Click" ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SortFilterTooltip]}"/>
+            </Grid>
+
+            <ListBox Grid.Row="1" x:Name="ReposList" Style="{StaticResource FlatListBox}" ItemContainerStyle="{StaticResource RepoRow}"
+                     Margin="12,0,8,0"
+                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Width="4" CornerRadius="2" Background="{Binding CategoryBorderColor}" Margin="0,2,12,2"/>
+                            <StackPanel Grid.Column="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Owner}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="8,0,0,0" VerticalAlignment="Bottom"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" Margin="0,3,0,5"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Language}" FontSize="11" Foreground="{StaticResource AccentCyanBrush}"/>
+                                    <TextBlock Text="  ★ " FontSize="11" Foreground="#FBBF24"/>
+                                    <TextBlock Text="{Binding StarsCount}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding LatestVersionTag}" FontSize="11" Foreground="#A5B4FC"/>
+                                    <TextBlock Text="  ·  " FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding VersionCountText}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding InstallBadgeText}" FontSize="11" Foreground="{StaticResource AccentEmeraldBrush}" Margin="10,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Width="120">
+                                <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                           HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusMessage}"/>
+                                <ProgressBar IsIndeterminate="{Binding IsUpdating}" Height="2" Margin="0,6,0,0" BorderThickness="0"
+                                             Background="Transparent" Foreground="{StaticResource AccentPrimaryBrush}"
+                                             Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Estado vazio -->
+            <StackPanel Grid.Row="1" x:Name="EmptyStatePanel" Visibility="Collapsed" MaxWidth="420"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateTitle]}"
+                           FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[EmptyStateDesc]}"
+                           FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0"/>
+            </StackPanel>
         </Grid>
 
-        <!-- Barra de Status Inferior -->
-        <Border Grid.Row="3" Background="{StaticResource BgSecondaryBrush}" BorderBrush="#1E293B" BorderThickness="0,1,0,0" Padding="24,10">
+        <!-- ============ PAINEL DE DETALHES ============ -->
+        <Border Grid.Column="2" Background="{StaticResource BgSecondaryBrush}" BorderBrush="{StaticResource BorderFaintBrush}" BorderThickness="1,0,0,0">
+            <Grid>
+                <TextBlock x:Name="DetailsEmptyText" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsEmpty]}"
+                           Foreground="{StaticResource TextMutedBrush}" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <Grid x:Name="DetailsPanel" DataContext="{Binding SelectedItem, ElementName=ReposList}" Margin="22,20,22,16" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Cabeçalho -->
+                    <StackPanel>
+                        <Button Tag="{Binding}" Click="ChangeCategoryBadge_Click" Cursor="Hand" HorizontalAlignment="Left"
+                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardChangeCategoryTooltip]}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{Binding CategoryBgColor}" CornerRadius="5" Padding="8,2">
+                                        <TextBlock Text="{Binding Category}" Foreground="{Binding CategoryTextColor}" FontSize="11" FontWeight="SemiBold"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <TextBlock Text="{Binding Name}" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding RepoUrl}" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Description}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" MaxHeight="72" TextTrimming="CharacterEllipsis" Margin="0,10,0,0"/>
+                    </StackPanel>
+
+                    <!-- Ações -->
+                    <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                        <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectBtn]}"
+                                Style="{StaticResource PrimaryButton}" Tag="{Binding}" Click="CreateProject_Click" Padding="10,9"
+                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardCreateProjectTooltip]}"/>
+                        <UniformGrid Columns="3" Margin="0,8,0,0">
+                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncBtn]}" Style="{StaticResource SecondaryButton}"
+                                    Tag="{Binding}" Click="SyncSingleRepo_Click" Margin="0,0,4,0"
+                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardSyncTooltip]}"/>
+                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsBtn]}" Style="{StaticResource SecondaryButton}"
+                                    Tag="{Binding}" Click="OpenRepoFolder_Click" Margin="2,0,2,0"
+                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardOpenZipsTooltip]}"/>
+                            <Button Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebBtn]}" Style="{StaticResource SecondaryButton}"
+                                    Tag="{Binding}" Click="OpenGitHubUrl_Click" Margin="4,0,0,0"
+                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebTooltip]}"/>
+                        </UniformGrid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Style="{StaticResource SecondaryButton}" Tag="{Binding}" Click="InstallMenu_Click" HorizontalContentAlignment="Stretch"
+                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallTooltip]}">
+                                <TextBlock>
+                                    <Run Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallBtn], Mode=OneWay}"/>
+                                    <Run Text="{Binding InstallBadgeText, Mode=OneWay}" Foreground="{StaticResource AccentEmeraldBrush}"/>
+                                </TextBlock>
+                            </Button>
+                            <Button Grid.Column="1" Content="🗑" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Padding="12,7"
+                                    Tag="{Binding}" Click="RemoveRepo_Click"
+                                    ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardRemoveTooltip]}"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Versões -->
+                    <TextBlock Grid.Row="2" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsVersionsHeader]}"
+                               FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,20,0,6"/>
+                    <ListBox Grid.Row="3" ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion, Mode=TwoWay}"
+                             Style="{StaticResource FlatListBox}" ItemContainerStyle="{StaticResource NavItem}" MaxHeight="168">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding DisplayTitle}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding FormattedSize}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="8,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Notas -->
+                    <DockPanel Grid.Row="4" Margin="0,16,0,0">
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[DetailsNotesShortHeader]}"
+                                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"/>
+                        <Border Background="{StaticResource BgPrimaryBrush}" CornerRadius="8" Padding="12,10">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBox Text="{Binding ActiveNotes, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
+                                         Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                         FontFamily="Cascadia Mono, Consolas"/>
+                            </ScrollViewer>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ============ RODAPÉ ============ -->
+        <Border Grid.Row="1" Grid.ColumnSpan="3" Background="{StaticResource BgSecondaryBrush}" BorderBrush="{StaticResource BorderFaintBrush}" BorderThickness="0,1,0,0" Padding="16,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="FooterStatusText"
-                           Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[FooterReadyStatus]}"
-                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" x:Name="FooterLibraryPathText"
-                           FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                <TextBlock x:Name="FooterStatusText" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="1" x:Name="FooterLibraryPathText" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" Margin="16,0,0,0"/>
             </Grid>
         </Border>
     </Grid>
