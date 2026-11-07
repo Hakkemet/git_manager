@@ -12,6 +12,8 @@ public class ConfigService
 {
     private const string RegistryRunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string AppRegistryName = "GitManager";
+    // Manifesto salvo dentro de cada pasta de repositório: permite restaurar a biblioteca só copiando as pastas
+    public const string RepoManifestName = ".gitmanager.json";
 
     public string BaseDirectory { get; }
     public string ConfigFilePath { get; }
@@ -89,11 +91,90 @@ public class ConfigService
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(Config, options);
             File.WriteAllText(ConfigFilePath, json);
+            WriteRepositoryManifests(options);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Erro ao salvar config: {ex.Message}");
         }
+    }
+
+    private void WriteRepositoryManifests(JsonSerializerOptions options)
+    {
+        foreach (var repo in Config.Repositories)
+        {
+            try
+            {
+                var folder = GetRepositoryFolder(repo);
+                if (!Directory.Exists(folder)) continue;
+                var path = Path.Combine(folder, RepoManifestName);
+                var json = JsonSerializer.Serialize(repo, options);
+                if (File.Exists(path) && File.ReadAllText(path) == json) continue;
+                File.WriteAllText(path, json);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Aviso ao salvar manifesto: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adiciona à config os repositórios que existem como pasta na biblioteca mas não estão cadastrados
+    /// (biblioteca copiada de backup / após formatar). Usa o manifesto se existir, senão o nome "owner__repo".
+    /// </summary>
+    public int ImportRepositoriesFromLibrary()
+    {
+        if (!Directory.Exists(Config.LibraryPath)) return 0;
+        int imported = 0;
+
+        foreach (var dir in Directory.GetDirectories(Config.LibraryPath))
+        {
+            try
+            {
+                RepositoryItem? repo = null;
+                var manifest = Path.Combine(dir, RepoManifestName);
+                if (File.Exists(manifest))
+                    repo = JsonSerializer.Deserialize<RepositoryItem>(File.ReadAllText(manifest));
+
+                if (repo == null || string.IsNullOrWhiteSpace(repo.Name))
+                {
+                    var folderName = Path.GetFileName(dir);
+                    var sep = folderName.IndexOf("__", StringComparison.Ordinal);
+                    if (sep <= 0 || sep + 2 >= folderName.Length) continue; // não é pasta de repositório
+                    if (!Directory.EnumerateFiles(dir, "*.zip").Any()) continue;
+                    repo = new RepositoryItem
+                    {
+                        Owner = folderName[..sep],
+                        Name = folderName[(sep + 2)..],
+                        Description = string.Empty
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(repo.RepoUrl))
+                    repo.RepoUrl = $"https://github.com/{repo.Owner}/{repo.Name}";
+
+                bool exists = Config.Repositories.Any(r =>
+                    string.Equals(r.Owner, repo.Owner, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(r.Name, repo.Name, StringComparison.OrdinalIgnoreCase));
+                if (exists) continue;
+
+                // Instalação vinculada é específica do PC: após restaurar, o usuário vincula de novo
+                if (!string.IsNullOrWhiteSpace(repo.InstallPath) && !Directory.Exists(repo.InstallPath))
+                {
+                    repo.InstallPath = string.Empty;
+                    repo.InstalledVersion = string.Empty;
+                }
+
+                Config.Repositories.Add(repo);
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Aviso ao importar {dir}: {ex.Message}");
+            }
+        }
+        return imported;
     }
 
     public void EnsureLibraryDirectories()
@@ -116,6 +197,18 @@ public class ConfigService
                 "Backend / API"
             };
         }
+
+        // Usuário apontou para a pasta que CONTÉM a biblioteca: desce para GitManagerLibrary
+        var nested = Path.Combine(Config.LibraryPath, "GitManagerLibrary");
+        if (Directory.Exists(nested) &&
+            !Directory.GetDirectories(Config.LibraryPath).Any(d => Path.GetFileName(d).Contains("__")))
+        {
+            Config.LibraryPath = nested;
+            SaveConfig();
+        }
+
+        if (ImportRepositoriesFromLibrary() > 0)
+            SaveConfig();
 
         foreach (var repo in Config.Repositories)
         {
@@ -147,6 +240,14 @@ public class ConfigService
         if (!Directory.Exists(folder))
             return;
 
+        // Biblioteca movida/restaurada: o .zip está na pasta atual com o mesmo nome, só o caminho antigo mudou
+        foreach (var v in repo.Versions)
+        {
+            var local = Path.Combine(folder, v.FileName);
+            if (!string.IsNullOrWhiteSpace(v.FileName) && File.Exists(local))
+                v.FullPath = local;
+        }
+
         // Remove da lista entradas cujo arquivo .zip foi deletado manualmente
         var existingEntries = repo.Versions.Where(v => File.Exists(v.FullPath)).ToList();
 
@@ -165,9 +266,13 @@ public class ConfigService
                     FileName = fi.Name,
                     FullPath = fi.FullName,
                     VersionTag = Path.GetFileNameWithoutExtension(fi.Name),
-                    CommitSha = "local",
+                    CommitSha = System.Text.RegularExpressions.Regex.Match(fi.Name, @"_([0-9a-f]{7,40})\.zip$") is { Success: true } m ? m.Groups[1].Value : "local",
                     ReleaseNotes = "Arquivo .zip encontrado diretamente na pasta do repositório.",
-                    CreatedAt = fi.CreationTime,
+                    // Cópia/backup reseta a data do arquivo; o nome guarda a data real do download
+                    CreatedAt = System.Text.RegularExpressions.Regex.Match(fi.Name, @"_(\d{8}_\d{6})_") is { Success: true } dm &&
+                                DateTime.TryParseExact(dm.Groups[1].Value, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.None, out var named)
+                        ? named
+                        : fi.CreationTime,
                     FileSizeBytes = fi.Length
                 });
             }
@@ -178,6 +283,8 @@ public class ConfigService
         {
             repo.Versions.Add(item);
         }
+        if (repo.Versions.Count > 0 && string.IsNullOrWhiteSpace(repo.LatestCommitSha) && repo.Versions[0].CommitSha != "local")
+            repo.LatestCommitSha = repo.Versions[0].CommitSha;
         repo.NotifyVersionsChanged();
     }
 

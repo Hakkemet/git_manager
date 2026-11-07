@@ -729,6 +729,7 @@ public partial class MainWindow : Window
         };
         if (win.ShowDialog() == true && win.SettingsSaved)
         {
+            RefreshCategorySelectors();
             UpdateFooterInfo();
             RefreshRepositoryList();
         }
