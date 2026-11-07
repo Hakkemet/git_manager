@@ -178,6 +178,6 @@ public class AppSelfUpdateService
         if (Version.TryParse(current, out var vCurr) && Version.TryParse(latest, out var vLat))
             return vLat > vCurr;
 
-        return !string.Equals(current, latest, StringComparison.OrdinalIgnoreCase);
+        return false; // tag fora do padrão de versão: nunca arrisca "atualizar" para algo mais antigo
     }
 }

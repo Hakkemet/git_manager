@@ -241,6 +241,30 @@ public class RepositoryItem : INotifyPropertyChanged
 
     public string FolderPath { get; set; } = string.Empty;
 
+    private string _installPath = string.Empty;
+    private string _installedVersion = string.Empty;
+
+    /// <summary>Pasta de uma instalação real (fora da biblioteca) mantida na última release.</summary>
+    public string InstallPath
+    {
+        get => _installPath;
+        set { _installPath = value ?? string.Empty; OnPropertyChanged(); OnPropertyChanged(nameof(HasInstall)); OnPropertyChanged(nameof(InstallBadgeText)); }
+    }
+
+    public string InstalledVersion
+    {
+        get => _installedVersion;
+        set { _installedVersion = value ?? string.Empty; OnPropertyChanged(); OnPropertyChanged(nameof(InstallBadgeText)); }
+    }
+
+    [JsonIgnore]
+    public bool HasInstall => !string.IsNullOrWhiteSpace(InstallPath);
+
+    [JsonIgnore]
+    public string InstallBadgeText => HasInstall
+        ? $"🖥️ {(string.IsNullOrWhiteSpace(InstalledVersion) ? "—" : InstalledVersion)}"
+        : string.Empty;
+
     public void NotifyVersionsChanged()
     {
         OnPropertyChanged(nameof(Versions));

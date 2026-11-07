@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:svc="clr-namespace:GitManager.Services"
         Title="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsTitle]}"
-        Width="540" Height="500"
+        Width="560" Height="580"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{StaticResource BgPrimaryBrush}"
@@ -51,6 +51,20 @@
                     <Button Grid.Column="1"
                             Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[BrowseBtn]}"
                             Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="BrowseLibraryFolder_Click"/>
+                </Grid>
+
+                <!-- Pasta de instalação do próprio app -->
+                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsInstallPathLabel]}"
+                           FontSize="12.5" FontWeight="SemiBold" Foreground="#CBD5E1" Margin="0,0,0,6"/>
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="InstallPathBox" Style="{StaticResource ModernTextBox}" IsReadOnly="True"/>
+                    <Button Grid.Column="1"
+                            Content="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[SettingsOpenInstallFolderBtn]}"
+                            Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="OpenInstallFolder_Click"/>
                 </Grid>
 
                 <!-- Programação de atualização diária -->

@@ -22,7 +22,6 @@ public partial class MainWindow : Window
     private readonly GitHubService _gitHubService;
     private readonly AppSelfUpdateService _selfUpdateService;
     private readonly Action<string, string> _showBalloon;
-    private readonly DispatcherTimer _backgroundTimer;
 
     public ObservableCollection<RepositoryItem> DisplayedRepositories { get; } = new();
 
@@ -36,7 +35,6 @@ public partial class MainWindow : Window
         _gitHubService = gitHubService;
         _selfUpdateService = selfUpdateService;
         _showBalloon = showBalloon;
-        _backgroundTimer = new DispatcherTimer();
 
         InitializeComponent();
 
@@ -48,8 +46,6 @@ public partial class MainWindow : Window
         UpdateFooterInfo();
 
         LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
-
-        ConfigureBackgroundTimer();
 
         Loaded += async (_, _) =>
         {
@@ -136,18 +132,6 @@ public partial class MainWindow : Window
             _configService.SaveConfig();
             RefreshCategorySelectors();
         }
-    }
-
-    private void ConfigureBackgroundTimer()
-    {
-        // A verificação automática ocorre apenas uma vez ao dia no primeiro momento em que o app é aberto.
-        _backgroundTimer.Stop();
-    }
-
-    private async void BackgroundTimer_Tick(object? sender, EventArgs e)
-    {
-        await CheckSelfUpdateSilentAsync();
-        await SyncAllRepositoriesAsync(forceNotification: false);
     }
 
     private async Task CheckSelfUpdateSilentAsync()
@@ -432,6 +416,7 @@ public partial class MainWindow : Window
     {
         FooterStatusText.Text = $"Syncing {item.FullName}...";
         var (updated, msg) = await _gitHubService.SyncRepositoryAsync(item, forceDownload);
+        await UpdateInstallationAsync(item, force: false);
         _configService.SaveConfig();
         RefreshRepositoryList();
         FooterStatusText.Text = $"{item.FullName}: {msg}";
@@ -457,6 +442,7 @@ public partial class MainWindow : Window
                 _configService.ReconcileFolderZipFiles(repo);
                 var (updated, _) = await _gitHubService.SyncRepositoryAsync(repo, forceDownload: false);
                 if (updated) updatedCount++;
+                await UpdateInstallationAsync(repo, force: false);
             }
 
             _configService.SaveConfig();
@@ -565,8 +551,16 @@ public partial class MainWindow : Window
         try
         {
             item.StatusMessage = LocalizationService.Instance["StatusExtracting"];
-            await _gitHubService.CreateProjectFromZipAsync(selectedZip, targetFolder);
+            var result = await _gitHubService.CreateProjectFromZipAsync(selectedZip, targetFolder);
             item.StatusMessage = LocalizationService.Instance["StatusProjectCreated"];
+            if (result.Failed.Count > 0)
+            {
+                System.Windows.MessageBox.Show(
+                    LocalizationService.Instance.Format("MsgExtractPartialBody", result.Failed.Count, string.Join("\n", result.Failed.Take(8))),
+                    LocalizationService.Instance["MsgExtractPartialTitle"],
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
 
             var openExplorer = System.Windows.MessageBox.Show(
                 LocalizationService.Instance.Format("MsgProjectCreatedBody", selectedZip.FileName, targetFolder),
@@ -579,6 +573,15 @@ public partial class MainWindow : Window
                 Process.Start("explorer.exe", targetFolder);
             }
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            item.StatusMessage = LocalizationService.Instance["StatusExtractError"];
+            System.Windows.MessageBox.Show(
+                LocalizationService.Instance.Format("MsgNoPermissionBody", targetFolder, ex.Message),
+                LocalizationService.Instance["MsgNoPermissionTitle"],
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
         catch (Exception ex)
         {
             item.StatusMessage = LocalizationService.Instance["StatusExtractError"];
@@ -588,6 +591,87 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private async Task UpdateInstallationAsync(RepositoryItem item, bool force)
+    {
+        if (!item.HasInstall) return;
+        var (updated, msg) = await _gitHubService.UpdateInstallationAsync(item, force);
+        _configService.SaveConfig();
+        if (updated)
+            _showBalloon(LocalizationService.Instance.Format("InstallBalloonTitle", item.FullName), msg);
+        else if (force && !string.IsNullOrWhiteSpace(msg))
+            FooterStatusText.Text = $"{item.FullName}: {msg}";
+    }
+
+    private void InstallMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { Tag: RepositoryItem item } btn)
+            return;
+
+        var L = LocalizationService.Instance;
+        var menu = new ContextMenu();
+
+        var link = new MenuItem { Header = item.HasInstall ? L["InstallMenuChange"] : L["InstallMenuLink"] };
+        link.Click += async (_, _) =>
+        {
+            using var dlg = new Forms.FolderBrowserDialog
+            {
+                Description = L.Format("InstallPickFolderDesc", item.Name),
+                UseDescriptionForTitle = true,
+                ShowNewFolderButton = true,
+                SelectedPath = item.InstallPath
+            };
+            if (dlg.ShowDialog() != Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dlg.SelectedPath))
+                return;
+
+            var libRoot = Path.GetFullPath(_configService.Config.LibraryPath).TrimEnd('\\') + "\\";
+            if ((Path.GetFullPath(dlg.SelectedPath).TrimEnd('\\') + "\\").StartsWith(libRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                System.Windows.MessageBox.Show(L["InstallInsideLibraryBody"], L["InstallMenuLink"], MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            item.InstallPath = dlg.SelectedPath;
+            item.InstalledVersion = string.Empty;
+            _configService.SaveConfig();
+
+            var confirm = System.Windows.MessageBox.Show(
+                L.Format("InstallLinkedBody", item.FullName, item.InstallPath),
+                L["InstallMenuLink"], MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm == MessageBoxResult.Yes)
+                await UpdateInstallationAsync(item, force: true);
+        };
+        menu.Items.Add(link);
+
+        if (item.HasInstall)
+        {
+            var updateNow = new MenuItem { Header = L["InstallMenuUpdateNow"] };
+            updateNow.Click += async (_, _) => await UpdateInstallationAsync(item, force: true);
+            menu.Items.Add(updateNow);
+
+            var open = new MenuItem { Header = L["InstallMenuOpen"] };
+            open.Click += (_, _) =>
+            {
+                if (Directory.Exists(item.InstallPath))
+                    Process.Start("explorer.exe", item.InstallPath);
+            };
+            menu.Items.Add(open);
+
+            menu.Items.Add(new Separator());
+            var unlink = new MenuItem { Header = L["InstallMenuUnlink"] };
+            unlink.Click += (_, _) =>
+            {
+                // Só desvincula; os arquivos da instalação não são apagados
+                item.InstallPath = string.Empty;
+                item.InstalledVersion = string.Empty;
+                _configService.SaveConfig();
+            };
+            menu.Items.Add(unlink);
+        }
+
+        menu.PlacementTarget = btn;
+        menu.IsOpen = true;
     }
 
     private void OpenRepoFolder_Click(object sender, RoutedEventArgs e)
@@ -645,7 +729,6 @@ public partial class MainWindow : Window
         };
         if (win.ShowDialog() == true && win.SettingsSaved)
         {
-            ConfigureBackgroundTimer();
             UpdateFooterInfo();
             RefreshRepositoryList();
         }

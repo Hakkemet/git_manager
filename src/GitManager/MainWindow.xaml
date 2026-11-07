@@ -339,6 +339,17 @@
                                                     ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardWebTooltip]}"/>
                                         </UniformGrid>
 
+                                        <Button Style="{StaticResource SecondaryButton}"
+                                                Padding="4,5" FontSize="11" Margin="0,6,0,0" HorizontalAlignment="Stretch"
+                                                Tag="{Binding}" Click="InstallMenu_Click"
+                                                ToolTip="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallTooltip]}">
+                                            <Grid>
+                                                <TextBlock Text="{Binding Source={x:Static svc:LocalizationService.Instance}, Path=[CardInstallBtn]}"/>
+                                                <TextBlock Text="{Binding InstallBadgeText}" HorizontalAlignment="Right"
+                                                           Foreground="{StaticResource AccentEmeraldBrush}" Margin="6,0,0,0"/>
+                                            </Grid>
+                                        </Button>
+
                                         <TextBlock Text="{Binding LastCheckedText}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                                    HorizontalAlignment="Right" Margin="0,5,0,0"/>
                                     </StackPanel>

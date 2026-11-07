@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -16,6 +17,8 @@ using GitManager.Models;
 
 namespace GitManager.Services;
 
+public record ExtractResult(int Extracted, List<string> Failed);
+
 public class GitHubService
 {
     private readonly HttpClient _http;
@@ -30,7 +33,7 @@ public class GitHubService
         {
             Timeout = TimeSpan.FromMinutes(10)
         };
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("GitManager", "1.1.0"));
+        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("GitManager", AppSelfUpdateService.CurrentVersion));
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
     }
 
@@ -66,6 +69,9 @@ public class GitHubService
                 CreateNoWindow = true,
                 UseShellExecute = false
             };
+            // Nunca abrir janela de login/prompt: só lê credencial já salva
+            psi.Environment["GCM_INTERACTIVE"] = "never";
+            psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
             using var proc = Process.Start(psi);
             if (proc == null) return null;
@@ -73,8 +79,13 @@ public class GitHubService
             proc.StandardInput.Write("protocol=https\nhost=github.com\n\n");
             proc.StandardInput.Close();
 
-            var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(2000);
+            var readTask = proc.StandardOutput.ReadToEndAsync();
+            if (!readTask.Wait(5000))
+            {
+                try { proc.Kill(true); } catch { }
+                return null;
+            }
+            var output = readTask.Result;
 
             foreach (var line in output.Split('\n'))
             {
@@ -121,7 +132,7 @@ public class GitHubService
 
         try
         {
-            ConfigureAuthHeader();
+            await Task.Run(ConfigureAuthHeader, ct);
             item.Owner = owner;
             item.Name = repoName;
 
@@ -287,10 +298,12 @@ public class GitHubService
 
             // 4. Faz o download do repositório completo em formato .zip direto para a pasta do repositório em GitManagerLibrary
             item.StatusMessage = LocalizationService.Instance["StatusDownloadingZip"];
-            var safeTag = SanitizeToken(versionTag);
+            // O zip contém o HEAD da branch, então o nome usa a branch (a tag da release fica em VersionTag)
+            var safeTag = SanitizeToken(item.DefaultBranch);
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var zipFileName = $"{SanitizeToken(repoName)}_{timestamp}_{safeTag}_{shortLatestSha}.zip";
             var zipFullPath = Path.Combine(repoFolder, zipFileName);
+            var partPath = zipFullPath + ".part";
 
             bool downloaded = false;
             if (!usedFallback)
@@ -299,7 +312,7 @@ public class GitHubService
                 using var zipResp = await _http.GetAsync(archiveUrl, HttpCompletionOption.ResponseHeadersRead, ct);
                 if (zipResp.IsSuccessStatusCode)
                 {
-                    await using var fs = new FileStream(zipFullPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await using var fs = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None);
                     await zipResp.Content.CopyToAsync(fs, ct);
                     downloaded = true;
                 }
@@ -317,7 +330,7 @@ public class GitHubService
                     if (pubResp.IsSuccessStatusCode)
                     {
                         item.DefaultBranch = branch;
-                        await using var fs = new FileStream(zipFullPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                        await using var fs = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None);
                         await pubResp.Content.CopyToAsync(fs, ct);
                         downloaded = true;
                         break;
@@ -326,7 +339,22 @@ public class GitHubService
             }
 
             if (!downloaded)
+            {
+                TryDelete(partPath);
                 throw new InvalidOperationException("Could not download .zip archive from GitHub.");
+            }
+
+            // Só vira .zip depois de baixado e validado: um download interrompido nunca entra na biblioteca
+            try
+            {
+                using (ZipFile.OpenRead(partPath)) { }
+            }
+            catch
+            {
+                TryDelete(partPath);
+                throw new InvalidDataException("Downloaded .zip is corrupted; it will be retried on the next sync.");
+            }
+            File.Move(partPath, zipFullPath, overwrite: true);
 
             var fileInfo = new FileInfo(zipFullPath);
             var newVersion = new ZipVersionEntry
@@ -351,12 +379,121 @@ public class GitHubService
         }
         catch (Exception ex)
         {
+            if (Directory.Exists(item.FolderPath))
+                foreach (var part in Directory.GetFiles(item.FolderPath, "*.part"))
+                    TryDelete(part);
             item.StatusMessage = $"Error: {ex.Message}";
             return (false, ex.Message);
         }
         finally
         {
             item.IsUpdating = false;
+        }
+    }
+
+    /// <summary>
+    /// Atualiza a instalação vinculada (InstallPath) para a última release do GitHub.
+    /// Usa o asset .zip da release; sem asset, o código-fonte da tag; sem release, o zip mais novo da biblioteca.
+    /// </summary>
+    public async Task<(bool Updated, string Message)> UpdateInstallationAsync(RepositoryItem item, bool force = false, CancellationToken ct = default)
+    {
+        var L = LocalizationService.Instance;
+        if (!item.HasInstall)
+            return (false, string.Empty);
+        if (!TryParseGitHubUrl(item.RepoUrl, out var owner, out var repoName))
+            return (false, "Invalid GitHub URL.");
+
+        string tempDir = Path.Combine(Path.GetTempPath(), "GitManager_Install_" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            await Task.Run(ConfigureAuthHeader, ct);
+
+            string version = string.Empty;
+            string downloadUrl = string.Empty;
+            string? localZip = null;
+
+            using (var relResp = await _http.GetAsync($"https://api.github.com/repos/{owner}/{repoName}/releases/latest", ct))
+            {
+                if (relResp.IsSuccessStatusCode)
+                {
+                    using var doc = JsonDocument.Parse(await relResp.Content.ReadAsStringAsync(ct));
+                    var root = doc.RootElement;
+                    version = root.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
+                    if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var a in assets.EnumerateArray())
+                        {
+                            var name = a.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                            if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            {
+                                downloadUrl = a.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
+                                break;
+                            }
+                        }
+                    }
+                    if (string.IsNullOrEmpty(downloadUrl) && !string.IsNullOrEmpty(version))
+                        downloadUrl = $"https://github.com/{owner}/{repoName}/archive/refs/tags/{Uri.EscapeDataString(version)}.zip";
+                }
+                else if (relResp.StatusCode != HttpStatusCode.NotFound)
+                {
+                    // API indisponível/rate limit: descobre a tag pelo redirect público de /releases/latest
+                    using var webResp = await _http.GetAsync($"https://github.com/{owner}/{repoName}/releases/latest", ct);
+                    var finalUrl = webResp.RequestMessage?.RequestUri?.AbsolutePath ?? "";
+                    var m = Regex.Match(finalUrl, @"/releases/tag/([^/]+)$");
+                    if (m.Success)
+                    {
+                        version = Uri.UnescapeDataString(m.Groups[1].Value);
+                        downloadUrl = $"https://github.com/{owner}/{repoName}/archive/refs/tags/{Uri.EscapeDataString(version)}.zip";
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(downloadUrl))
+            {
+                // Repositório sem releases: segue o último commit já baixado na biblioteca
+                var newest = item.Versions.FirstOrDefault(v => File.Exists(v.FullPath));
+                if (newest == null)
+                    return (false, L["InstallNoSource"]);
+                localZip = newest.FullPath;
+                version = newest.CommitSha.Length >= 7 ? newest.CommitSha[..7] : newest.CommitSha;
+            }
+
+            if (!force && string.Equals(version, item.InstalledVersion, StringComparison.OrdinalIgnoreCase) && Directory.Exists(item.InstallPath))
+                return (false, L.Format("InstallUpToDate", version));
+
+            item.StatusMessage = L.Format("InstallUpdating", version);
+            if (localZip == null)
+            {
+                Directory.CreateDirectory(tempDir);
+                localZip = Path.Combine(tempDir, "install.zip");
+                using var resp = await _http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+                resp.EnsureSuccessStatusCode();
+                await using (var fs = new FileStream(localZip, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await resp.Content.CopyToAsync(fs, ct);
+            }
+
+            var result = await Task.Run(() => ExtractZip(localZip, item.InstallPath), ct);
+            if (result.Failed.Count > 0)
+            {
+                // Não marca como instalada: na próxima sync tenta de novo (ex.: programa estava aberto)
+                var msg = L.Format("InstallPartial", version, result.Failed.Count);
+                item.StatusMessage = msg;
+                return (false, msg + "\n" + string.Join("\n", result.Failed.Take(5)));
+            }
+
+            item.InstalledVersion = version;
+            var done = L.Format("InstallUpdated", version);
+            item.StatusMessage = done;
+            return (true, done);
+        }
+        catch (Exception ex)
+        {
+            item.StatusMessage = $"Error: {ex.Message}";
+            return (false, ex.Message);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
         }
     }
 
@@ -432,48 +569,74 @@ public class GitHubService
             item.LatestVersionTag = string.IsNullOrWhiteSpace(item.DefaultBranch) ? "main" : item.DefaultBranch;
     }
 
-    public Task CreateProjectFromZipAsync(ZipVersionEntry versionEntry, string destinationFolder)
+    public Task<ExtractResult> CreateProjectFromZipAsync(ZipVersionEntry versionEntry, string destinationFolder)
     {
-        return Task.Run(() =>
+        if (!File.Exists(versionEntry.FullPath))
+            throw new FileNotFoundException("The .zip archive for this version was not found in the library.", versionEntry.FullPath);
+        return Task.Run(() => ExtractZip(versionEntry.FullPath, destinationFolder));
+    }
+
+    /// <summary>Extrai o zip removendo a pasta raiz única; falhas por arquivo não abortam a extração.</summary>
+    public static ExtractResult ExtractZip(string zipPath, string destinationFolder)
+    {
+        var fullDestRoot = Path.GetFullPath(destinationFolder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        Directory.CreateDirectory(fullDestRoot);
+
+        using var archive = ZipFile.OpenRead(zipPath);
+        string? commonRootPrefix = DetectSingleRootPrefix(archive);
+        int ok = 0;
+        var failed = new List<string>();
+
+        foreach (var entry in archive.Entries)
         {
-            if (!File.Exists(versionEntry.FullPath))
-                throw new FileNotFoundException("The .zip archive for this version was not found in the library.", versionEntry.FullPath);
+            var relativePath = entry.FullName;
+            if (!string.IsNullOrEmpty(commonRootPrefix) && relativePath.StartsWith(commonRootPrefix, StringComparison.Ordinal))
+                relativePath = relativePath[commonRootPrefix.Length..];
 
-            Directory.CreateDirectory(destinationFolder);
+            if (string.IsNullOrWhiteSpace(relativePath))
+                continue;
 
-            using var archive = ZipFile.OpenRead(versionEntry.FullPath);
-            string? commonRootPrefix = DetectSingleRootPrefix(archive);
-
-            foreach (var entry in archive.Entries)
+            try
             {
-                var relativePath = entry.FullName;
-                if (!string.IsNullOrEmpty(commonRootPrefix) && relativePath.StartsWith(commonRootPrefix, StringComparison.Ordinal))
-                {
-                    relativePath = relativePath[commonRootPrefix.Length..];
-                }
-
-                if (string.IsNullOrWhiteSpace(relativePath))
-                    continue;
-
-                var targetPath = Path.GetFullPath(Path.Combine(destinationFolder, relativePath));
-                var fullDestRoot = Path.GetFullPath(destinationFolder);
+                var targetPath = Path.GetFullPath(Path.Combine(fullDestRoot, relativePath));
                 if (!targetPath.StartsWith(fullDestRoot, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                    continue; // zip slip
 
                 if (string.IsNullOrEmpty(entry.Name))
                 {
                     Directory.CreateDirectory(targetPath);
+                    continue;
                 }
-                else
-                {
-                    var parentDir = Path.GetDirectoryName(targetPath);
-                    if (!string.IsNullOrEmpty(parentDir))
-                        Directory.CreateDirectory(parentDir);
 
-                    entry.ExtractToFile(targetPath, overwrite: true);
+                var parentDir = Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrEmpty(parentDir))
+                    Directory.CreateDirectory(parentDir);
+
+                // Arquivo somente-leitura existente bloqueia a sobrescrita com "acesso negado"
+                if (File.Exists(targetPath))
+                {
+                    var attrs = File.GetAttributes(targetPath);
+                    if (attrs.HasFlag(FileAttributes.ReadOnly))
+                        File.SetAttributes(targetPath, attrs & ~FileAttributes.ReadOnly);
                 }
+
+                entry.ExtractToFile(targetPath, overwrite: true);
+                ok++;
             }
-        });
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+            {
+                failed.Add($"{relativePath}: {ex.Message}");
+            }
+        }
+
+        if (ok == 0 && failed.Count > 0)
+            throw new UnauthorizedAccessException(failed[0]);
+        return new ExtractResult(ok, failed);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
     private static string? DetectSingleRootPrefix(ZipArchive archive)

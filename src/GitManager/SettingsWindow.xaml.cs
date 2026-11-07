@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using GitManager.Services;
@@ -21,12 +23,21 @@ public partial class SettingsWindow : Window
 
         var cfg = _configService.Config;
         LibraryPathBox.Text = cfg.LibraryPath;
+        InstallPathBox.Text = InstallFolder;
         StartWithWindowsCheck.IsChecked = cfg.StartWithWindows;
         MinimizeToTrayCheck.IsChecked = cfg.MinimizeToTrayOnClose;
         GitHubTokenBox.Text = cfg.GitHubToken;
 
         var currentLang = string.IsNullOrWhiteSpace(cfg.Language) ? LocalizationService.DefaultLanguage : cfg.Language;
         LanguageComboBox.SelectedIndex = currentLang.Equals("pt_BR", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+    }
+
+    private static string InstallFolder =>
+        Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+
+    private void OpenInstallFolder_Click(object sender, RoutedEventArgs e)
+    {
+        Process.Start("explorer.exe", InstallFolder);
     }
 
     private void BrowseLibraryFolder_Click(object sender, RoutedEventArgs e)
